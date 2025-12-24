@@ -1,7 +1,8 @@
 import mlflow
+import numpy as np
 import lightgbm as lgb
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, mean_squared_error, mean_absolute_error, r2_score
 
 from src.utils.preprocessing import load_and_prepare_data
 
@@ -33,6 +34,9 @@ def main():
         mlflow.log_metric("accuracy", accuracy_score(y_test, preds))
         mlflow.log_metric("f1_score", f1_score(y_test, preds))
         mlflow.log_metric("roc_auc", roc_auc_score(y_test, probs))
+        mlflow.log_metric("rmse", np.sqrt(mean_squared_error(y_test, probs)))
+        mlflow.log_metric("mae", mean_absolute_error(y_test, probs))
+        mlflow.log_metric("r2", r2_score(y_test, probs))
 
 
 if __name__ == "__main__":

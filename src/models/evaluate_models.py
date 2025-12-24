@@ -2,27 +2,34 @@ import mlflow
 import mlflow.sklearn
 
 import pandas as pd
+import numpy as np
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, mean_squared_error, mean_absolute_error, r2_score
 
 from xgboost import XGBClassifier
 import lightgbm as lgb
 from catboost import CatBoostClassifier
 
-from src.utils.preprocessing import load_and_preprocess_data
+from src.utils.preprocessing import load_and_prepare_data
 
 
 def evaluate_model(name, model, X_train, X_test, y_train, y_test):
     model.fit(X_train, y_train)
     preds = model.predict(X_test)
+    preds_proba = model.predict_proba(X_test)[:, 1]
 
     metrics = {
         "accuracy": accuracy_score(y_test, preds),
         "precision": precision_score(y_test, preds, zero_division=0),
         "recall": recall_score(y_test, preds, zero_division=0),
         "f1_score": f1_score(y_test, preds, zero_division=0),
+        "roc_auc": roc_auc_score(y_test, preds_proba),
+        "rmse": np.sqrt(mean_squared_error(y_test, preds_proba)),
+        "mae": mean_absolute_error(y_test, preds_proba),
+        "r2": r2_score(y_test, preds_proba),
     }
 
     mlflow.set_experiment("Model_Comparison")
@@ -35,9 +42,10 @@ def evaluate_model(name, model, X_train, X_test, y_train, y_test):
 
 
 def main():
-    X_train, X_test, y_train, y_test = load_and_preprocess_data(
-        csv_path="data/processed/training_dataset.csv",
-        target_col="recommended"
+    X, y = load_and_prepare_data("data/processed/training_dataset.csv")
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
     )
 
     models = {

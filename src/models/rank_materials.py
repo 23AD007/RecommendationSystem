@@ -1,21 +1,33 @@
 import pandas as pd
-import joblib
+import lightgbm as lgb
+from sklearn.model_selection import train_test_split
+
+from src.utils.preprocessing import load_and_prepare_data
 
 def rank_materials():
-    df = pd.read_csv("data/processed/engineered_training_dataset.csv")
+    # Load and preprocess data
+    X, y = load_and_prepare_data("data/processed/training_dataset.csv")
 
-    # Load saved objects
-    model = joblib.load("models/best_model.pkl")
-    preprocessor = joblib.load("models/preprocessor.pkl")
+    # Train a quick model for ranking
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
 
-    # Same features as training
-    X = df.drop(columns=["recommended"])
+    model = lgb.LGBMClassifier(
+        n_estimators=100,  # Quick training
+        learning_rate=0.1,
+        max_depth=6,
+        random_state=42,
+        verbose=-1
+    )
 
-    # 🔥 APPLY SAME PREPROCESSING
-    X_processed = preprocessor.transform(X)
+    model.fit(X_train, y_train)
 
-    # Predict scores
-    scores = model.predict_proba(X_processed)[:, 1]
+    # Load original data for ranking
+    df = pd.read_csv("data/processed/training_dataset.csv")
+
+    # Predict scores on full dataset
+    scores = model.predict_proba(X)[:, 1]
 
     df["recommendation_score"] = scores
 

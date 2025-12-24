@@ -5,7 +5,7 @@ import mlflow.xgboost
 
 from xgboost import XGBRegressor
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 
 
 def main():
@@ -116,10 +116,12 @@ def main():
 
         mse = mean_squared_error(y_test, preds)
         rmse = mse ** 0.5
+        mae = mean_absolute_error(y_test, preds)
         r2 = r2_score(y_test, preds)
 
         mlflow.log_metrics({
             "rmse": rmse,
+            "mae": mae,
             "r2_score": r2
         })
 
@@ -130,8 +132,7 @@ def main():
         )
 
         print("✅ Training completed successfully")
-        print(f"RMSE: {rmse:.4f}")
-        print(f"R2 Score: {r2:.4f}")
+        print(f"RMSE: {rmse:.4f}, MAE: {mae:.4f}, R2 Score: {r2:.4f}")
 
 
 if __name__ == "__main__":
