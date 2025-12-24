@@ -42,6 +42,6 @@ def extract_text_from_pdf(pdf_path: str) -> str:
 
 if __name__ == "__main__":
     # Manual test
-    sample_pdf = "data/documents/supplier_report_2025.pdf"
+    sample_pdf = "D:\\INTERNSHIP_CODE\\Packaging-Recommendation-System\\src\\ecopackdb\\supplier_report_2025.pdf"
     extracted = extract_text_from_pdf(sample_pdf)
     print(extracted[:1000])
