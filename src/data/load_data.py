@@ -1,21 +1,22 @@
-import pandas as pd
-from sqlalchemy import create_engine
-from src.utils.config import DATABASE_URL
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
+from src.config import Config
 
-def load_training_data():
-    engine = create_engine(DATABASE_URL)
+_engine = None
 
-    query = """
-    SELECT
-        fragility_score,
-        sustainability_priority,
-        durability_requirement,
-        max_packaging_cost,
-        material_cost,
-        innovation_level,
-        overall_sustainability_score
-    FROM training_dataset
-    WHERE overall_sustainability_score IS NOT NULL
-    """
+def get_engine():
+    global _engine
+    if _engine is None:
+        _engine = create_engine(Config.DATABASE_URL, pool_pre_ping=True)
+    return _engine
 
-    return pd.read_sql(query, engine)
+
+def test_db_connection():
+    try:
+        engine = get_engine()
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except SQLAlchemyError as e:
+        print("Database connection error:", e)
+        return False

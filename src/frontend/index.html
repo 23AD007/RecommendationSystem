@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Packaging Recommendation System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            display: none;
+        }
+        .material-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Packaging Recommendation System</h1>
+
+        <form id="recommendationForm">
+            <div class="form-group">
+                <label for="productCategory">Product Category:</label>
+                <select id="productCategory" required>
+                    <option value="">Select a category...</option>
+                    <option value="electronics">Electronics</option>
+                    <option value="food">Food & Beverage</option>
+                    <option value="glassware">Glassware</option>
+                    <option value="pharmaceutical">Pharmaceutical</option>
+                    <option value="cosmetics">Cosmetics</option>
+                    <option value="household">Household Items</option>
+                    <option value="synthetic_product">Industrial Products</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="fragility">Fragility Score (0-1):</label>
+                <input type="number" id="fragility" min="0" max="1" step="0.01" value="0.8" required>
+            </div>
+
+            <div class="form-group">
+                <label for="sustainability">Sustainability Priority (0-1):</label>
+                <input type="number" id="sustainability" min="0" max="1" step="0.01" value="0.7" required>
+            </div>
+
+            <div class="form-group">
+                <label for="durability">Durability Requirement (0-1):</label>
+                <input type="number" id="durability" min="0" max="1" step="0.01" value="0.6" required>
+            </div>
+
+            <div class="form-group">
+                <label for="materialCost">Material Cost ($):</label>
+                <input type="number" id="materialCost" min="0" step="0.01" value="40" required>
+            </div>
+
+            <div class="form-group">
+                <label for="maxCost">Max Packaging Cost ($):</label>
+                <input type="number" id="maxCost" min="0" step="0.01" value="100" required>
+            </div>
+
+            <div class="form-group">
+                <label for="innovation">Innovation Level (1-5):</label>
+                <input type="number" id="innovation" min="1" max="5" step="0.1" value="3" required>
+            </div>
+
+            <button type="button" onclick="getRecommendation()">Get Recommendations</button>
+        </form>
+
+        <div id="results">
+            <h2>Recommendations</h2>
+            <div id="materials"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+
+
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="container">
+                <p>&copy; 2026 Packaging Recommendation System. Powered by AI & Machine Learning.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

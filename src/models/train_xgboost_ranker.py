@@ -11,9 +11,9 @@ from src.etl.feature_engineering import derive_features, CORE_FEATURES
 
 def main():
     # --------------------------------------------------
-    # 0. 🔑 DISABLE AUTOLOGGING (CRITICAL FIX)
+    # 0.  DISABLE AUTOLOGGING
     # --------------------------------------------------
-    mlflow.autolog(disable=True)
+    
 
     # --------------------------------------------------
     # 1. Load training data

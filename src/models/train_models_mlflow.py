@@ -2,7 +2,13 @@ import pandas as pd
 import numpy as np
 import mlflow
 import mlflow.xgboost
+from sklearn.ensemble import RandomForestClassifier
 
+from src.etl.features import CORE_FEATURES
+from src.etl.feature_engineering import derive_features
+import json
+import tempfile
+from src.models.material_affinity import learn_material_affinity
 from xgboost import XGBRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
@@ -15,7 +21,8 @@ def main():
     df = pd.read_csv("data/processed/training_dataset.csv")
 
     print("Initial columns:", df.columns.tolist())
-
+    df = derive_features(df)
+    df[CORE_FEATURES] = df[CORE_FEATURES].replace([np.inf, -np.inf], np.nan)    
     # --------------------------------------------------
     # 2. DERIVE CORE SUSTAINABILITY FEATURES
     # (because they do NOT exist in raw data)
@@ -48,18 +55,6 @@ def main():
     # --------------------------------------------------
     # 3. CLEAN DERIVED FEATURES (CRITICAL)
     # --------------------------------------------------
-    CORE_FEATURES = [
-        "eco_pressure",
-        "cost_efficiency",
-        "durability_pressure",
-        "innovation_level",
-        "material_cost",
-        "fragility_score",
-        "max_packaging_cost",
-        "durability_requirement",
-        "sustainability_priority",
-    ]
-
     df[CORE_FEATURES] = df[CORE_FEATURES].replace([np.inf, -np.inf], np.nan)
 
     df[CORE_FEATURES] = df[CORE_FEATURES].apply(
@@ -130,9 +125,38 @@ def main():
             model.get_booster(),
             artifact_path="xgboost_model"
         )
+                # --------------------------------------------------
+        # Learn material–product affinity
+        # --------------------------------------------------
+        affinity = learn_material_affinity(df)
+
+        # Save to temp file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
+            json.dump(affinity, tmp, indent=2)
+            affinity_path = tmp.name
+
+        # Log as MLflow artifact
+        mlflow.log_artifact(
+            affinity_path,
+            artifact_path="material_affinity"
+        )
+        mlflow.log_param("uses_material_affinity", True)
+        mlflow.log_param(
+            "affinity_categories",
+            ",".join(sorted(df["product_category"].unique()))
+        )
+
+        print("✅ Material affinity logged to MLflow")
+
 
         print("✅ Training completed successfully")
         print(f"RMSE: {rmse:.4f}, MAE: {mae:.4f}, R2 Score: {r2:.4f}")
+        affinity = learn_material_affinity(df)
+
+        with open("models/material_affinity.json", "w") as f:
+            json.dump(affinity, f, indent=2)
+
+        print("✅ Learned material affinity saved")
 
 
 if __name__ == "__main__":

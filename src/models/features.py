@@ -17,6 +17,7 @@ FEATURE_COLUMNS = [
     "max_packaging_cost",
     "durability_requirement",
     "sustainability_priority",
+    "product_category_encoded"
 ]
 
 # Optional / metadata columns (never used for training)

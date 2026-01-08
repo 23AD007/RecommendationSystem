@@ -11,7 +11,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 
 from xgboost import XGBClassifier
 import lightgbm as lgb
-from catboost import CatBoostClassifier
+# from catboost import CatBoostClassifier
 
 from src.utils.preprocessing import load_and_prepare_data
 
@@ -65,14 +65,14 @@ def main():
             n_estimators=300,
             learning_rate=0.05,
             random_state=42
-        ),
-        "CatBoost": CatBoostClassifier(
-            iterations=300,
-            learning_rate=0.05,
-            depth=6,
-            verbose=0,
-            random_seed=42
         )
+        # "CatBoost": CatBoostClassifier(
+        #     iterations=300,
+        #     learning_rate=0.05,
+        #     depth=6,
+        #     verbose=0,
+        #     random_seed=42
+        # )
     }
 
     results = []

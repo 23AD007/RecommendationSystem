@@ -1,5 +1,5 @@
 import pandas as pd
-import lightgbm as lgb
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
 from src.utils.preprocessing import load_and_prepare_data
@@ -13,12 +13,9 @@ def rank_materials():
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    model = lgb.LGBMClassifier(
+    model = RandomForestClassifier(
         n_estimators=100,  # Quick training
-        learning_rate=0.1,
-        max_depth=6,
-        random_state=42,
-        verbose=-1
+        random_state=42
     )
 
     model.fit(X_train, y_train)
