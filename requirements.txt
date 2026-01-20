@@ -8,7 +8,6 @@ numpy
 scikit-learn
 joblib
 imbalanced-learn
-python-dotenv
 requests
 plotly
 matplotlib

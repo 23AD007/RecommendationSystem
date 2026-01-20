@@ -6,20 +6,20 @@ import os
 from src.models.improved_recommendation_model import get_recommendation_model
 from src.etl.feature_engineering import derive_features
 
-# --------------------------------------------------
-# App setup
-# --------------------------------------------------
+# ==================================================
+# APP SETUP
+# ==================================================
 app = Flask(__name__)
 CORS(app)
 
-# --------------------------------------------------
-# Load model ONCE
-# --------------------------------------------------
+# ==================================================
+# LOAD MODEL (SAFE, FALLBACK ENABLED)
+# ==================================================
 model = get_recommendation_model()
 
-# --------------------------------------------------
-# Input schema
-# --------------------------------------------------
+# ==================================================
+# REQUIRED INPUT SCHEMA
+# ==================================================
 REQUIRED_FIELDS = {
     "product_category": str,
     "fragility_score": (int, float),
@@ -30,28 +30,28 @@ REQUIRED_FIELDS = {
     "innovation_level": (int, float),
 }
 
-# --------------------------------------------------
-# Explanation helper
-# --------------------------------------------------
-def generate_explanations(row: pd.Series):
+# ==================================================
+# EXPLANATION HELPER
+# ==================================================
+def generate_explanations(row):
     return {
         "fragility": f"Fragility score {row['fragility_score']:.2f} required protective packaging",
-        "sustainability": f"Sustainability priority {row['sustainability_priority']:.2f} favored eco-friendly materials",
-        "durability": f"Durability requirement {row['durability_requirement']:.2f} influenced structural strength",
+        "sustainability": f"Sustainability priority {row['sustainability_priority']:.2f} favored eco materials",
+        "durability": f"Durability requirement {row['durability_requirement']:.2f} influenced material strength",
         "cost": f"Material cost evaluated under max budget {row['max_packaging_cost']}",
-        "innovation": f"Innovation level {row['innovation_level']:.2f} supported modern material choice",
+        "innovation": f"Innovation level {row['innovation_level']:.2f} encouraged modern materials",
     }
 
-# --------------------------------------------------
-# Health check
-# --------------------------------------------------
+# ==================================================
+# HEALTH CHECK
+# ==================================================
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok"})
+    return jsonify({"status": "ok"}), 200
 
-# --------------------------------------------------
-# Recommendation endpoint
-# --------------------------------------------------
+# ==================================================
+# RECOMMENDATION ENDPOINT
+# ==================================================
 @app.route("/api/product/recommend-materials", methods=["POST"])
 def recommend_materials():
     data = request.get_json()
@@ -66,36 +66,35 @@ def recommend_materials():
         if not isinstance(data[field], t):
             return jsonify({"status": "error", "message": f"Invalid type for {field}"}), 400
 
-    # Prepare dataframe
+    # Convert to DataFrame
     df = pd.DataFrame([data])
 
-    # Feature engineering
+    # Feature engineering (SAFE)
     try:
         df = derive_features(df)
     except Exception as e:
-        return jsonify({"status": "error", "message": f"Feature error: {e}"}), 500
+        return jsonify({
+            "status": "error",
+            "message": f"Feature engineering failed: {e}"
+        }), 500
 
-    # Model inference
-    try:
-        pred = model.predict(df)
-    except Exception as e:
-        return jsonify({"status": "error", "message": f"Model error: {e}"}), 500
+    # ==================================================
+    # 🔒 ONLY .predict() — NO OTHER MODEL LOGIC
+    # ==================================================
+    prediction = model.predict(df)
 
-    confidence = round(float(pred.get("confidence", 0.0)) * 100, 2)
+    confidence = round(float(prediction.get("confidence", 0.0)) * 100, 2)
 
-    # --------------------------------------------------
-    # 🔒 GUARANTEED RESPONSE CONTRACT
-    # --------------------------------------------------
     response = {
         "status": "success",
         "confidence_score": confidence,
 
-        # ALWAYS PRESENT
+        # GUARANTEED KEY
         "recommendations": [
             {
-                "material": pred.get("material", "Sustainable Packaging Material"),
+                "material": prediction.get("material", "Sustainable Packaging"),
                 "confidence": confidence,
-                "reason": "Selected by ML model considering sustainability, cost, and durability trade-offs"
+                "reason": "Selected using fallback-safe recommendation logic"
             }
         ],
 
@@ -106,6 +105,9 @@ def recommend_materials():
     return jsonify(response), 200
 
 
+# ==================================================
+# LOCAL RUN (IGNORED BY GUNICORN)
+# ==================================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
