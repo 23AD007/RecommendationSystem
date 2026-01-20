@@ -60,7 +60,7 @@ h1, h2, h3 {color: #D4A373;}
 # --------------------------------------------------
 # BACKEND CONFIG (CHANGE AFTER DEPLOYMENT)
 # --------------------------------------------------
-BACKEND_URL = "https://recommendationsystem-txbe.onrender.com"
+BACKEND_URL = "https://recommendationsystem-txbe.onrender.com/api/product/recommend-materials"
 API_KEY = "packaging-api-key-2024"
 
 # --------------------------------------------------
@@ -113,17 +113,21 @@ if st.button("🚀 Generate AI Recommendation", use_container_width=True):
         "innovation_level": innovation_level
     }
 
-    headers = {"X-API-Key": API_KEY}
+    headers = {
+    "Content-Type": "application/json"
+    }
+
 
     try:
-        response = requests.post(BACKEND_URL, json=payload, headers=headers, timeout=10)
+        response = requests.post(
+            BACKEND_URL,
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=15
+        )
         data = response.json()
-    except Exception:
-        st.error("❌ Backend not reachable.")
-        st.stop()
-
-    if data.get("status") != "success":
-        st.error(data.get("message", "Unknown backend error"))
+    except Exception as e:
+        st.error(f"❌ Backend not reachable: {e}")
         st.stop()
 
     # --------------------------------------------------
