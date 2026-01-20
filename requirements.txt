@@ -2,6 +2,7 @@ Flask>=3.0,<4.0
 flask-cors
 gunicorn
 
+streamlit
 pandas
 numpy
 scikit-learn
@@ -12,5 +13,7 @@ requests
 plotly
 matplotlib
 seaborn
-
 waitress
+
+reportlab
+openpyxl
