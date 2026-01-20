@@ -15,3 +15,6 @@ models/**/*.pkl
 
 # Python cache
 __pycache__/
+
+# Virtual environment
+.venv/
