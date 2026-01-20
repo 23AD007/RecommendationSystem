@@ -65,20 +65,9 @@ class ImprovedRecommendationModel:
     # --------------------------------------------------
     # PREDICT (FINAL, STABLE)
     # --------------------------------------------------
-    def predict(self, product_data):
+    def predict(self, df):
         if not self.is_trained and not self.load_model():
-            return {
-                "recommended": False,
-                "confidence": 0.3,
-                "decision_summary": {
-                    "Model Status": "Fallback confidence used due to missing model"
-                }
-            }
-
-        if isinstance(product_data, dict):
-            df = pd.DataFrame([product_data])
-        else:
-            df = product_data.copy()
+            raise RuntimeError("Model not available")
 
         df = self.preprocess_data(df)
 
@@ -86,37 +75,27 @@ class ImprovedRecommendationModel:
             if f not in df.columns:
                 df[f] = 0
 
-        X = df[self.feature_names]
-        X_scaled = self.scaler.transform(X)
+        X = self.scaler.transform(df[self.feature_names])
 
-        # 🔑 RAW probability
-        raw_confidence = float(self.model.predict_proba(X_scaled)[0][1])
+        proba = self.model.predict_proba(X)[0][1]
+        confidence = float(round(proba, 3))
+        recommended = confidence >= 0.5
 
-        # 🔑 CALIBRATION (CRITICAL)
-        # Prevents collapse to 0.0
-        calibrated_confidence = round(
-            0.35 + 0.65 * raw_confidence,
-            3
-        )
+        # Feature importance–based explainability
+        importances = self.model.feature_importances_
+        top_idx = importances.argsort()[-3:][::-1]
 
-        recommended = calibrated_confidence >= 0.55
-
-        decision_summary = {
-            "Sustainability Impact":
-                f"Priority = {df.at[0,'sustainability_priority']:.2f}",
-            "Fragility Impact":
-                f"Fragility = {df.at[0,'fragility_score']:.2f}",
-            "Cost Constraint":
-                f"Cost = {df.at[0,'material_cost']} / {df.at[0,'max_packaging_cost']}",
-            "Innovation Influence":
-                f"Innovation level = {df.at[0,'innovation_level']}",
-            "Model Confidence":
-                f"Calibrated confidence = {calibrated_confidence}"
-        }
+        decision_summary = {}
+        for i in top_idx:
+            fname = self.feature_names[i]
+            decision_summary[fname] = (
+                f"{fname} had strong influence "
+                f"(importance={importances[i]:.2f}, value={df.iloc[0][fname]:.2f})"
+            )
 
         return {
             "recommended": recommended,
-            "confidence": calibrated_confidence,
+            "confidence": confidence,
             "decision_summary": decision_summary
         }
 
