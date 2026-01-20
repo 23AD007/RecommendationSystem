@@ -2,96 +2,47 @@ import streamlit as st
 import requests
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import io
 
 from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 
-# --------------------------------------------------
-# CONFIG
-# --------------------------------------------------
-st.set_page_config(
-    page_title="AI Packaging Recommendation",
-    layout="wide"
-)
+st.set_page_config(page_title="AI Packaging Recommendation", layout="wide")
 
 BACKEND_URL = "https://recommendationsystem-txbe.onrender.com/api/product/recommend-materials"
 
-# --------------------------------------------------
-# HEADER
-# --------------------------------------------------
 st.title("📦 AI Packaging Recommendation System")
-st.caption(
-    "Sustainable packaging decisions using cost, durability, innovation, "
-    "and environmental intelligence"
-)
+st.caption("Explainable, sustainable packaging decisions using ML")
 
-# --------------------------------------------------
+# ==================================================
 # INPUTS
-# --------------------------------------------------
+# ==================================================
 st.subheader("🧾 Product & Sustainability Inputs")
 
-col1, col2, col3 = st.columns(3)
+c1, c2, c3 = st.columns(3)
 
-with col1:
+with c1:
     product_category = st.selectbox(
         "Product Category",
         ["electronics", "food", "pharmaceutical", "cosmetics", "household"]
     )
+    fragility_score = st.slider("Fragility Score", 0.0, 1.0, 0.6)
+    durability_requirement = st.slider("Durability Requirement", 0.0, 1.0, 0.7)
 
-    fragility_score = st.slider(
-        "Fragility Score",
-        0.0, 1.0, 0.6,
-        help="How fragile the product is"
-    )
+with c2:
+    sustainability_priority = st.slider("Sustainability Priority", 0.0, 1.0, 0.8)
+    eco_pressure = st.slider("Environmental Pressure", 0.0, 1.0, 0.75)
+    innovation_level = st.slider("Innovation Level", 0.0, 5.0, 3.0)
 
-    durability_requirement = st.slider(
-        "Durability Requirement",
-        0.0, 1.0, 0.7,
-        help="Required packaging strength"
-    )
+with c3:
+    material_cost = st.number_input("Material Cost", value=40.0)
+    max_packaging_cost = st.number_input("Max Packaging Budget", value=100.0)
+    cost_efficiency = st.slider("Cost Efficiency Priority", 0.0, 1.0, 0.6)
 
-with col2:
-    sustainability_priority = st.slider(
-        "Sustainability Priority",
-        0.0, 1.0, 0.8,
-        help="Importance of eco-friendly materials"
-    )
-
-    eco_pressure = st.slider(
-        "Environmental Pressure",
-        0.0, 1.0, 0.75,
-        help="Regulatory & environmental constraints"
-    )
-
-    innovation_level = st.slider(
-        "Innovation Level",
-        0.0, 5.0, 3.0,
-        help="Preference for innovative packaging materials"
-    )
-
-with col3:
-    material_cost = st.number_input(
-        "Material Cost",
-        value=40.0,
-        help="Cost of selected material"
-    )
-
-    max_packaging_cost = st.number_input(
-        "Maximum Packaging Budget",
-        value=100.0,
-        help="Budget constraint"
-    )
-
-    cost_efficiency = st.slider(
-        "Cost Efficiency Priority",
-        0.0, 1.0, 0.6,
-        help="Importance of low-cost packaging"
-    )
-
-# --------------------------------------------------
+# ==================================================
 # SUBMIT
-# --------------------------------------------------
+# ==================================================
 if st.button("🚀 Generate AI Recommendation", use_container_width=True):
 
     payload = {
@@ -102,110 +53,110 @@ if st.button("🚀 Generate AI Recommendation", use_container_width=True):
         "material_cost": material_cost,
         "max_packaging_cost": max_packaging_cost,
         "innovation_level": innovation_level,
-
-        # extra raw signals (derive_features will handle them)
         "eco_pressure": eco_pressure,
-        "cost_efficiency": cost_efficiency
+        "cost_efficiency": cost_efficiency,
     }
 
-    try:
-        response = requests.post(
-            BACKEND_URL,
-            json=payload,
-            headers={"Content-Type": "application/json"},
-            timeout=15
-        )
-        data = response.json()
-    except Exception as e:
-        st.error(f"❌ Backend not reachable: {e}")
-        st.stop()
+    r = requests.post(
+        BACKEND_URL,
+        json=payload,
+        headers={"Content-Type": "application/json"},
+        timeout=15
+    )
+
+    data = r.json()
 
     if data.get("status") != "success":
         st.error("❌ Backend returned an error")
         st.json(data)
         st.stop()
 
-    # --------------------------------------------------
-    # SAFE PARSING
-    # --------------------------------------------------
-    recommendations = data.get("recommendations", [])
+    rec_df = pd.DataFrame(data["recommendations"])
 
-    if not recommendations:
-        st.error("❌ No recommendations returned")
-        st.json(data)
-        st.stop()
-
-    rec_df = pd.DataFrame(recommendations)
-
-    # --------------------------------------------------
-    # TABS
-    # --------------------------------------------------
     tab1, tab2, tab3 = st.tabs(
-        ["📦 Recommendations", "📊 Dashboard", "🧠 Model Reasoning"]
+        ["📦 Recommendations", "📊 Analytics Dashboard", "🧠 Model Reasoning"]
     )
 
-    # ---------------- TAB 1 ----------------
+    # ==================================================
+    # TAB 1 – RECOMMENDATIONS
+    # ==================================================
     with tab1:
-        st.metric(
-            "Overall Confidence Score",
-            f"{data['confidence_score']}%"
+        st.metric("Overall Confidence", f"{data['confidence_score']}%")
+        for r in data["recommendations"]:
+            st.success(f"**{r['material']}** — {r['confidence']}%\n\n{r['reason']}")
+
+    # ==================================================
+    # TAB 2 – MULTI-CHART DASHBOARD
+    # ==================================================
+    with tab2:
+        st.subheader("📊 Decision Analytics")
+
+        # 1. Bar chart
+        st.plotly_chart(
+            px.bar(
+                rec_df,
+                x="material",
+                y="confidence",
+                title="Material Confidence Comparison",
+                template="plotly_dark"
+            ),
+            use_container_width=True
         )
 
-        for rec in recommendations:
-            st.success(
-                f"**{rec['material']}** — {rec['confidence']}%\n\n"
-                f"{rec['reason']}"
-            )
+        # 2. Radar chart
+        radar_df = pd.DataFrame({
+            "Metric": [
+                "Fragility",
+                "Durability",
+                "Sustainability",
+                "Cost Efficiency",
+                "Innovation",
+                "Eco Pressure"
+            ],
+            "Score": [
+                fragility_score,
+                durability_requirement,
+                sustainability_priority,
+                cost_efficiency,
+                innovation_level / 5,
+                eco_pressure
+            ]
+        })
 
-    # ---------------- TAB 2 ----------------
-    with tab2:
-        fig = px.bar(
-            rec_df,
-            x="material",
-            y="confidence",
-            title="Material Confidence Comparison",
+        fig_radar = px.line_polar(
+            radar_df,
+            r="Score",
+            theta="Metric",
+            line_close=True,
+            title="Input Constraint Radar",
             template="plotly_dark"
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig_radar, use_container_width=True)
 
-        # Excel
-        excel_buffer = io.BytesIO()
-        with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
-            rec_df.to_excel(writer, index=False)
-
-        st.download_button(
-            "📥 Download Excel Report",
-            excel_buffer.getvalue(),
-            "packaging_recommendations.xlsx",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        # 3. Heatmap
+        fig_heat = px.imshow(
+            radar_df.set_index("Metric").T,
+            aspect="auto",
+            title="Constraint Influence Heatmap",
+            color_continuous_scale="Viridis"
         )
+        st.plotly_chart(fig_heat, use_container_width=True)
 
-        # PDF
-        pdf_buffer = io.BytesIO()
-        doc = SimpleDocTemplate(pdf_buffer)
-        styles = getSampleStyleSheet()
+        # 4. Budget Utilization Gauge
+        budget_ratio = material_cost / max_packaging_cost
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=budget_ratio * 100,
+            title={"text": "Budget Utilization (%)"},
+            gauge={"axis": {"range": [0, 100]}}
+        ))
+        st.plotly_chart(fig_gauge, use_container_width=True)
 
-        content = [Paragraph("Packaging Recommendation Report", styles["Title"])]
-        for rec in recommendations:
-            content.append(
-                Paragraph(
-                    f"{rec['material']} — {rec['confidence']}%",
-                    styles["Normal"]
-                )
-            )
-
-        doc.build(content)
-
-        st.download_button(
-            "📄 Download PDF Report",
-            pdf_buffer.getvalue(),
-            "packaging_report.pdf",
-            "application/pdf"
-        )
-
-    # ---------------- TAB 3 ----------------
+    # ==================================================
+    # TAB 3 – MODEL REASONING
+    # ==================================================
     with tab3:
         for k, v in data["decision_summary"].items():
-            st.info(f"**{k.replace('_', ' ').title()}**: {v}")
+            st.info(f"**{k.replace('_',' ').title()}**: {v}")
 
         st.json(data["model_info"])

@@ -1,8 +1,8 @@
 import os
 
-# --------------------------------------------------
-# Fallback model (ALWAYS works)
-# --------------------------------------------------
+# ==================================================
+# FALLBACK MODEL (ALWAYS WORKS IN CLOUD)
+# ==================================================
 class FallbackRecommendationModel:
     def predict(self, df):
         return {
@@ -16,24 +16,21 @@ class FallbackRecommendationModel:
             "note": "Used because trained model is not available in cloud"
         }
 
-# --------------------------------------------------
-# Real model wrapper (optional)
-# --------------------------------------------------
+
+# ==================================================
+# OPTIONAL REAL MODEL WRAPPER
+# ==================================================
 class ImprovedRecommendationModel:
     def __init__(self):
-        # If you later add a real model file, load it here
         model_path = "models/recommendation_model.pkl"
-
         if not os.path.exists(model_path):
             raise FileNotFoundError("Model file not found")
 
-        # Example placeholder
-        self.model = None
+        self.model = None  # placeholder
 
     def predict(self, df):
-        # Placeholder for real prediction logic
         return {
-            "confidence": 0.9,
+            "confidence": 0.90,
             "material": "Advanced Bio-Packaging"
         }
 
@@ -42,9 +39,10 @@ class ImprovedRecommendationModel:
             "model": "trained-ml-model"
         }
 
-# --------------------------------------------------
-# SAFE factory (CRITICAL)
-# --------------------------------------------------
+
+# ==================================================
+# SAFE FACTORY
+# ==================================================
 def get_recommendation_model():
     try:
         return ImprovedRecommendationModel()
