@@ -13,14 +13,14 @@ app = Flask(__name__)
 CORS(app)
 
 # --------------------------------------------------
-# Load trained model (once at startup)
+# Load model ONCE
 # --------------------------------------------------
 model = get_recommendation_model()
 
 # --------------------------------------------------
 # Input schema
 # --------------------------------------------------
-RAW_REQUIRED_FIELDS = {
+REQUIRED_FIELDS = {
     "product_category": str,
     "fragility_score": (int, float),
     "sustainability_priority": (int, float),
@@ -31,15 +31,15 @@ RAW_REQUIRED_FIELDS = {
 }
 
 # --------------------------------------------------
-# Explanation generator
+# Explanation helper
 # --------------------------------------------------
 def generate_explanations(row: pd.Series):
     return {
         "fragility": f"Fragility score {row['fragility_score']:.2f} required protective packaging",
-        "sustainability": f"Sustainability priority {row['sustainability_priority']:.2f} favored eco materials",
-        "durability": f"Durability requirement {row['durability_requirement']:.2f} influenced material strength",
-        "cost": f"Material cost evaluated under budget {row['max_packaging_cost']}",
-        "innovation": f"Innovation level {row['innovation_level']:.2f} encouraged novel materials",
+        "sustainability": f"Sustainability priority {row['sustainability_priority']:.2f} favored eco-friendly materials",
+        "durability": f"Durability requirement {row['durability_requirement']:.2f} influenced structural strength",
+        "cost": f"Material cost evaluated under max budget {row['max_packaging_cost']}",
+        "innovation": f"Innovation level {row['innovation_level']:.2f} supported modern material choice",
     }
 
 # --------------------------------------------------
@@ -57,35 +57,48 @@ def recommend_materials():
     data = request.get_json()
 
     if not data:
-        return jsonify({"status": "error", "message": "Empty request"}), 400
+        return jsonify({"status": "error", "message": "Empty request body"}), 400
 
-    for field, t in RAW_REQUIRED_FIELDS.items():
+    # Validate inputs
+    for field, t in REQUIRED_FIELDS.items():
         if field not in data:
-            return jsonify({"status": "error", "message": f"Missing {field}"}), 400
+            return jsonify({"status": "error", "message": f"Missing field: {field}"}), 400
         if not isinstance(data[field], t):
             return jsonify({"status": "error", "message": f"Invalid type for {field}"}), 400
 
-    # Convert to DataFrame
+    # Prepare dataframe
     df = pd.DataFrame([data])
 
     # Feature engineering
-    df = derive_features(df)
+    try:
+        df = derive_features(df)
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Feature error: {e}"}), 500
 
     # Model inference
-    prediction = model.predict(df)
+    try:
+        pred = model.predict(df)
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Model error: {e}"}), 500
 
-    confidence = round(prediction["confidence"] * 100, 2)
+    confidence = round(float(pred.get("confidence", 0.0)) * 100, 2)
 
+    # --------------------------------------------------
+    # 🔒 GUARANTEED RESPONSE CONTRACT
+    # --------------------------------------------------
     response = {
         "status": "success",
         "confidence_score": confidence,
+
+        # ALWAYS PRESENT
         "recommendations": [
             {
-                "material": "Recycled Cardboard Composite",
+                "material": pred.get("material", "Sustainable Packaging Material"),
                 "confidence": confidence,
-                "reason": "Balances sustainability, durability, and cost efficiency"
+                "reason": "Selected by ML model considering sustainability, cost, and durability trade-offs"
             }
         ],
+
         "decision_summary": generate_explanations(df.iloc[0]),
         "model_info": model.get_model_info()
     }
