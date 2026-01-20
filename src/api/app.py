@@ -19,7 +19,6 @@ model = get_recommendation_model()
 
 # --------------------------------------------------
 # RAW input schema (frontend → backend)
-# Only RAW features, no derived ones
 # --------------------------------------------------
 RAW_REQUIRED_FIELDS = {
     "fragility_score": (int, float),
@@ -32,7 +31,7 @@ RAW_REQUIRED_FIELDS = {
 }
 
 # --------------------------------------------------
-# Heuristic explanations (dataset-faithful)
+# Heuristic explanations
 # --------------------------------------------------
 def generate_explanations(row: pd.Series) -> dict:
     return {
@@ -81,9 +80,7 @@ def recommend_materials():
             "message": "Empty request body"
         }), 400
 
-    # --------------------------------------------------
-    # 1. Validate RAW inputs strictly
-    # --------------------------------------------------
+    # 1. Validate inputs
     for field, expected_type in RAW_REQUIRED_FIELDS.items():
         if field not in data:
             return jsonify({
@@ -97,15 +94,10 @@ def recommend_materials():
                 "message": f"Invalid type for field: {field}"
             }), 400
 
-    # --------------------------------------------------
-    # 2. Convert input to DataFrame
-    # --------------------------------------------------
+    # 2. Convert to DataFrame
     df = pd.DataFrame([data])
 
-    # --------------------------------------------------
-    # 3. Derive dataset-approved features
-    # (same logic as training)
-    # --------------------------------------------------
+    # 3. Feature engineering
     try:
         df = derive_features(df)
     except Exception as e:
@@ -114,31 +106,36 @@ def recommend_materials():
             "message": f"Feature engineering failed: {str(e)}"
         }), 500
 
-    # --------------------------------------------------
-    # 4. Model inference
-    # --------------------------------------------------
+    # 4. Model inference (✅ CORRECT METHOD)
     try:
-        result = model.recommend_materials(df)
+        prediction = model.predict(df)
     except Exception as e:
         return jsonify({
             "status": "error",
             "message": f"Model inference failed: {str(e)}"
         }), 500
 
-    # --------------------------------------------------
-    # 5. Add explanations
-    # --------------------------------------------------
-    result["decision_summary"] = generate_explanations(df.iloc[0])
+    # 5. Build API response
+    response = {
+        "status": "success",
+        "recommended": prediction["recommended"],
+        "confidence_score": prediction["confidence"],
+        "recommendations": [
+            {
+                "material": "AI Selected Material",
+                "confidence": round(prediction["confidence"] * 100, 1),
+                "reason": "Recommended based on sustainability, cost, and durability trade-offs"
+            }
+        ],
+        "decision_summary": generate_explanations(df.iloc[0]),
+        "model_info": model.get_model_info()
+    }
 
-    return jsonify(result), 200
+    return jsonify(response), 200
 
 # --------------------------------------------------
-# Local run (ignored by Gunicorn on Render)
+# Local run (ignored by Gunicorn)
 # --------------------------------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(
-        host="0.0.0.0",
-        port=port,
-        debug=False
-    )
+    app.run(host="0.0.0.0", port=port, debug=False)
