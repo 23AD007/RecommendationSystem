@@ -13,59 +13,41 @@ app = Flask(__name__)
 CORS(app)
 
 # --------------------------------------------------
-# Load trained recommendation model (ONCE)
+# Load trained model (once at startup)
 # --------------------------------------------------
 model = get_recommendation_model()
 
 # --------------------------------------------------
-# RAW input schema (frontend → backend)
+# Input schema
 # --------------------------------------------------
 RAW_REQUIRED_FIELDS = {
+    "product_category": str,
     "fragility_score": (int, float),
     "sustainability_priority": (int, float),
     "durability_requirement": (int, float),
     "material_cost": (int, float),
     "max_packaging_cost": (int, float),
     "innovation_level": (int, float),
-    "product_category": str
 }
 
 # --------------------------------------------------
-# Heuristic explanations
+# Explanation generator
 # --------------------------------------------------
-def generate_explanations(row: pd.Series) -> dict:
+def generate_explanations(row: pd.Series):
     return {
-        "fragility": (
-            f"Fragility score {row['fragility_score']:.2f} "
-            "increased the need for protective cushioning"
-        ),
-        "sustainability": (
-            f"Sustainability priority {row['sustainability_priority']:.2f} "
-            "favored environmentally friendly materials"
-        ),
-        "durability": (
-            f"Durability requirement {row['durability_requirement']:.2f} "
-            "influenced structural strength selection"
-        ),
-        "cost": (
-            f"Material cost was evaluated against the maximum budget "
-            f"{row['max_packaging_cost']}"
-        ),
-        "innovation": (
-            f"Innovation level {row['innovation_level']:.2f} "
-            "affected preference for novel materials"
-        ),
+        "fragility": f"Fragility score {row['fragility_score']:.2f} required protective packaging",
+        "sustainability": f"Sustainability priority {row['sustainability_priority']:.2f} favored eco materials",
+        "durability": f"Durability requirement {row['durability_requirement']:.2f} influenced material strength",
+        "cost": f"Material cost evaluated under budget {row['max_packaging_cost']}",
+        "innovation": f"Innovation level {row['innovation_level']:.2f} encouraged novel materials",
     }
 
 # --------------------------------------------------
-# Health check (Render requirement)
+# Health check
 # --------------------------------------------------
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({
-        "status": "ok",
-        "service": "AI Packaging Recommendation API"
-    })
+    return jsonify({"status": "ok"})
 
 # --------------------------------------------------
 # Recommendation endpoint
@@ -75,56 +57,33 @@ def recommend_materials():
     data = request.get_json()
 
     if not data:
-        return jsonify({
-            "status": "error",
-            "message": "Empty request body"
-        }), 400
+        return jsonify({"status": "error", "message": "Empty request"}), 400
 
-    # 1. Validate inputs
-    for field, expected_type in RAW_REQUIRED_FIELDS.items():
+    for field, t in RAW_REQUIRED_FIELDS.items():
         if field not in data:
-            return jsonify({
-                "status": "error",
-                "message": f"Missing required field: {field}"
-            }), 400
+            return jsonify({"status": "error", "message": f"Missing {field}"}), 400
+        if not isinstance(data[field], t):
+            return jsonify({"status": "error", "message": f"Invalid type for {field}"}), 400
 
-        if not isinstance(data[field], expected_type):
-            return jsonify({
-                "status": "error",
-                "message": f"Invalid type for field: {field}"
-            }), 400
-
-    # 2. Convert to DataFrame
+    # Convert to DataFrame
     df = pd.DataFrame([data])
 
-    # 3. Feature engineering
-    try:
-        df = derive_features(df)
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": f"Feature engineering failed: {str(e)}"
-        }), 500
+    # Feature engineering
+    df = derive_features(df)
 
-    # 4. Model inference (✅ CORRECT METHOD)
-    try:
-        prediction = model.predict(df)
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": f"Model inference failed: {str(e)}"
-        }), 500
+    # Model inference
+    prediction = model.predict(df)
 
-    # 5. Build API response
+    confidence = round(prediction["confidence"] * 100, 2)
+
     response = {
         "status": "success",
-        "recommended": prediction["recommended"],
-        "confidence_score": prediction["confidence"],
+        "confidence_score": confidence,
         "recommendations": [
             {
-                "material": "AI Selected Material",
-                "confidence": round(prediction["confidence"] * 100, 1),
-                "reason": "Recommended based on sustainability, cost, and durability trade-offs"
+                "material": "Recycled Cardboard Composite",
+                "confidence": confidence,
+                "reason": "Balances sustainability, durability, and cost efficiency"
             }
         ],
         "decision_summary": generate_explanations(df.iloc[0]),
@@ -133,9 +92,7 @@ def recommend_materials():
 
     return jsonify(response), 200
 
-# --------------------------------------------------
-# Local run (ignored by Gunicorn)
-# --------------------------------------------------
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port)
