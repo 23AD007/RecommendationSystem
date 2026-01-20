@@ -1,17 +1,17 @@
-# Python
-__pycache__/
-*.pyc
+# MLflow
+mlruns/
+mlartifacts/
 
-# Virtual environment
-.venv/
-venv/
-
-# ML models
+# Models
 models/*.pkl
+models/**/*.pkl
 
-# Environment variables
-.env
+# Large artifacts
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.onnx
 
-# OS files
-.DS_Store
-Thumbs.db
+# Python cache
+__pycache__/
