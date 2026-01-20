@@ -10,7 +10,10 @@ from reportlab.lib.styles import getSampleStyleSheet
 # --------------------------------------------------
 # CONFIG
 # --------------------------------------------------
-st.set_page_config(page_title="AI Packaging Recommendation", layout="wide")
+st.set_page_config(
+    page_title="AI Packaging Recommendation",
+    layout="wide"
+)
 
 BACKEND_URL = "https://recommendationsystem-txbe.onrender.com/api/product/recommend-materials"
 
@@ -18,52 +21,101 @@ BACKEND_URL = "https://recommendationsystem-txbe.onrender.com/api/product/recomm
 # HEADER
 # --------------------------------------------------
 st.title("📦 AI Packaging Recommendation System")
-st.caption("Explainable ML-based sustainable packaging decisions")
+st.caption(
+    "Sustainable packaging decisions using cost, durability, innovation, "
+    "and environmental intelligence"
+)
 
 # --------------------------------------------------
 # INPUTS
 # --------------------------------------------------
-c1, c2, c3 = st.columns(3)
+st.subheader("🧾 Product & Sustainability Inputs")
 
-with c1:
+col1, col2, col3 = st.columns(3)
+
+with col1:
     product_category = st.selectbox(
         "Product Category",
         ["electronics", "food", "pharmaceutical", "cosmetics", "household"]
     )
-    fragility_score = st.slider("Fragility", 0.0, 1.0, 0.7)
 
-with c2:
-    sustainability_priority = st.slider("Sustainability Priority", 0.0, 1.0, 0.8)
-    durability_requirement = st.slider("Durability Requirement", 0.0, 1.0, 0.6)
+    fragility_score = st.slider(
+        "Fragility Score",
+        0.0, 1.0, 0.6,
+        help="How fragile the product is"
+    )
 
-with c3:
-    material_cost = st.number_input("Material Cost", value=40.0)
-    max_packaging_cost = st.number_input("Max Packaging Cost", value=100.0)
-    innovation_level = st.number_input("Innovation Level", value=3.0)
+    durability_requirement = st.slider(
+        "Durability Requirement",
+        0.0, 1.0, 0.7,
+        help="Required packaging strength"
+    )
+
+with col2:
+    sustainability_priority = st.slider(
+        "Sustainability Priority",
+        0.0, 1.0, 0.8,
+        help="Importance of eco-friendly materials"
+    )
+
+    eco_pressure = st.slider(
+        "Environmental Pressure",
+        0.0, 1.0, 0.75,
+        help="Regulatory & environmental constraints"
+    )
+
+    innovation_level = st.slider(
+        "Innovation Level",
+        0.0, 5.0, 3.0,
+        help="Preference for innovative packaging materials"
+    )
+
+with col3:
+    material_cost = st.number_input(
+        "Material Cost",
+        value=40.0,
+        help="Cost of selected material"
+    )
+
+    max_packaging_cost = st.number_input(
+        "Maximum Packaging Budget",
+        value=100.0,
+        help="Budget constraint"
+    )
+
+    cost_efficiency = st.slider(
+        "Cost Efficiency Priority",
+        0.0, 1.0, 0.6,
+        help="Importance of low-cost packaging"
+    )
 
 # --------------------------------------------------
 # SUBMIT
 # --------------------------------------------------
-if st.button("🚀 Generate AI Recommendation"):
+if st.button("🚀 Generate AI Recommendation", use_container_width=True):
 
     payload = {
         "product_category": product_category,
         "fragility_score": fragility_score,
-        "sustainability_priority": sustainability_priority,
         "durability_requirement": durability_requirement,
+        "sustainability_priority": sustainability_priority,
         "material_cost": material_cost,
         "max_packaging_cost": max_packaging_cost,
-        "innovation_level": innovation_level
+        "innovation_level": innovation_level,
+
+        # extra raw signals (derive_features will handle them)
+        "eco_pressure": eco_pressure,
+        "cost_efficiency": cost_efficiency
     }
 
     try:
-        r = requests.post(
+        response = requests.post(
             BACKEND_URL,
             json=payload,
             headers={"Content-Type": "application/json"},
             timeout=15
         )
-        data = r.json()
+        data = response.json()
     except Exception as e:
         st.error(f"❌ Backend not reachable: {e}")
         st.stop()
@@ -74,12 +126,12 @@ if st.button("🚀 Generate AI Recommendation"):
         st.stop()
 
     # --------------------------------------------------
-    # 🔒 DEFENSIVE PARSING (NO KeyError EVER)
+    # SAFE PARSING
     # --------------------------------------------------
     recommendations = data.get("recommendations", [])
 
     if not recommendations:
-        st.error("❌ No recommendations returned by backend")
+        st.error("❌ No recommendations returned")
         st.json(data)
         st.stop()
 
@@ -88,13 +140,22 @@ if st.button("🚀 Generate AI Recommendation"):
     # --------------------------------------------------
     # TABS
     # --------------------------------------------------
-    tab1, tab2, tab3 = st.tabs(["📦 Recommendations", "📊 Dashboard", "🧠 Reasoning"])
+    tab1, tab2, tab3 = st.tabs(
+        ["📦 Recommendations", "📊 Dashboard", "🧠 Model Reasoning"]
+    )
 
     # ---------------- TAB 1 ----------------
     with tab1:
-        st.metric("Confidence Score", f"{data['confidence_score']}%")
-        for r in recommendations:
-            st.success(f"**{r['material']}** — {r['confidence']}%")
+        st.metric(
+            "Overall Confidence Score",
+            f"{data['confidence_score']}%"
+        )
+
+        for rec in recommendations:
+            st.success(
+                f"**{rec['material']}** — {rec['confidence']}%\n\n"
+                f"{rec['reason']}"
+            )
 
     # ---------------- TAB 2 ----------------
     with tab2:
@@ -107,40 +168,44 @@ if st.button("🚀 Generate AI Recommendation"):
         )
         st.plotly_chart(fig, use_container_width=True)
 
-        # Excel export
+        # Excel
         excel_buffer = io.BytesIO()
         with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
             rec_df.to_excel(writer, index=False)
 
         st.download_button(
-            "📥 Download Excel",
+            "📥 Download Excel Report",
             excel_buffer.getvalue(),
-            "recommendations.xlsx",
+            "packaging_recommendations.xlsx",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-        # PDF export
+        # PDF
         pdf_buffer = io.BytesIO()
         doc = SimpleDocTemplate(pdf_buffer)
         styles = getSampleStyleSheet()
 
         content = [Paragraph("Packaging Recommendation Report", styles["Title"])]
-        for r in recommendations:
+        for rec in recommendations:
             content.append(
-                Paragraph(f"{r['material']} — {r['confidence']}%", styles["Normal"])
+                Paragraph(
+                    f"{rec['material']} — {rec['confidence']}%",
+                    styles["Normal"]
+                )
             )
 
         doc.build(content)
 
         st.download_button(
-            "📄 Download PDF",
+            "📄 Download PDF Report",
             pdf_buffer.getvalue(),
-            "recommendations.pdf",
+            "packaging_report.pdf",
             "application/pdf"
         )
 
     # ---------------- TAB 3 ----------------
     with tab3:
         for k, v in data["decision_summary"].items():
-            st.info(f"**{k.capitalize()}**: {v}")
+            st.info(f"**{k.replace('_', ' ').title()}**: {v}")
+
         st.json(data["model_info"])
