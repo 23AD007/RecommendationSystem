@@ -60,7 +60,7 @@ h1, h2, h3 {color: #D4A373;}
 # --------------------------------------------------
 # BACKEND CONFIG (CHANGE AFTER DEPLOYMENT)
 # --------------------------------------------------
-BACKEND_URL = "http://localhost:5000/api/product/recommend-materials"
+BACKEND_URL = "https://recommendationsystem-txbe.onrender.com"
 API_KEY = "packaging-api-key-2024"
 
 # --------------------------------------------------
