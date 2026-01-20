@@ -1,105 +1,144 @@
-from flask import Flask, jsonify
-from src.config import Config
-from src.data.load_data import test_db_connection
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+import pandas as pd
+import os
 
-# Import blueprints
-from src.api.routes.data_routes import data_bp
-from src.api.routes.etl_routes import etl_bp
-from src.api.routes.models_routes import models_bp
-from src.api.routes.nlp_routes import nlp_bp
-from src.api.routes.utils_routes import utils_bp
-from src.api.routes.visualization_routes import visualization_bp
-from src.api.routes.db_routes import db_bp
-from src.api.routes.product_routes import product_bp
-from src.api.routes.security_routes import security_bp, require_api_key
+from src.models.improved_recommendation_model import get_recommendation_model
+from src.etl.feature_engineering import derive_features
 
-def create_app():
-    app = Flask(__name__)
-    app.config.from_object(Config)
+# --------------------------------------------------
+# App setup
+# --------------------------------------------------
+app = Flask(__name__)
+CORS(app)
 
-    # Register blueprints
-    app.register_blueprint(data_bp, url_prefix='/api/data')
-    app.register_blueprint(etl_bp, url_prefix='/api/etl')
-    app.register_blueprint(models_bp, url_prefix='/api/models')
-    app.register_blueprint(nlp_bp, url_prefix='/api/nlp')
-    app.register_blueprint(utils_bp, url_prefix='/api/utils')
-    app.register_blueprint(visualization_bp, url_prefix='/api/visualization')
-    app.register_blueprint(db_bp, url_prefix='/api/database')
-    app.register_blueprint(product_bp, url_prefix='/api/product')
-    app.register_blueprint(security_bp, url_prefix='/api/security')
+# --------------------------------------------------
+# Load trained recommendation model (ONCE)
+# --------------------------------------------------
+model = get_recommendation_model()
 
-    @app.route("/health", methods=["GET"])
-    def health_check():
-        db_status = test_db_connection()
+# --------------------------------------------------
+# RAW input schema (frontend → backend)
+# Only RAW features, no derived ones
+# --------------------------------------------------
+RAW_REQUIRED_FIELDS = {
+    "fragility_score": (int, float),
+    "sustainability_priority": (int, float),
+    "durability_requirement": (int, float),
+    "material_cost": (int, float),
+    "max_packaging_cost": (int, float),
+    "innovation_level": (int, float),
+    "product_category": str
+}
+
+# --------------------------------------------------
+# Heuristic explanations (dataset-faithful)
+# --------------------------------------------------
+def generate_explanations(row: pd.Series) -> dict:
+    return {
+        "fragility": (
+            f"Fragility score {row['fragility_score']:.2f} "
+            "increased the need for protective cushioning"
+        ),
+        "sustainability": (
+            f"Sustainability priority {row['sustainability_priority']:.2f} "
+            "favored environmentally friendly materials"
+        ),
+        "durability": (
+            f"Durability requirement {row['durability_requirement']:.2f} "
+            "influenced structural strength selection"
+        ),
+        "cost": (
+            f"Material cost was evaluated against the maximum budget "
+            f"{row['max_packaging_cost']}"
+        ),
+        "innovation": (
+            f"Innovation level {row['innovation_level']:.2f} "
+            "affected preference for novel materials"
+        ),
+    }
+
+# --------------------------------------------------
+# Health check (Render requirement)
+# --------------------------------------------------
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({
+        "status": "ok",
+        "service": "AI Packaging Recommendation API"
+    })
+
+# --------------------------------------------------
+# Recommendation endpoint
+# --------------------------------------------------
+@app.route("/api/product/recommend-materials", methods=["POST"])
+def recommend_materials():
+    data = request.get_json()
+
+    if not data:
         return jsonify({
-            "status": "ok" if db_status else "error",
-            "database": "connected" if db_status else "not connected"
-        })
+            "status": "error",
+            "message": "Empty request body"
+        }), 400
 
-    @app.route("/api", methods=["GET"])
-    def api_info():
-        """API information and available endpoints"""
-        endpoints = {
-            "data": [
-                "GET /api/data/test-db - Test database connection",
-                "POST /api/data/export-training-dataset - Export training dataset",
-                "GET /api/data/training-dataset-preview - Preview training dataset"
-            ],
-            "etl": [
-                "GET /api/etl/load-raw-data - Load raw data from database",
-                "POST /api/etl/clean-data - Clean loaded data",
-                "POST /api/etl/feature-engineering - Apply feature engineering"
-            ],
-            "models": [
-                "POST /api/models/evaluate/<model_name> - Evaluate specific model",
-                "GET /api/models/rank-materials - Rank materials",
-                "GET /api/models/available-models - List available models"
-            ],
-            "nlp": [
-                "POST /api/nlp/extract-features - Extract features from text",
-                "POST /api/nlp/extract-from-document - Extract from document text",
-                "GET /api/nlp/process-sample-text - Process sample text"
-            ],
-            "utils": [
-                "POST /api/utils/validate-schema - Validate data schema",
-                "GET /api/utils/preprocess-data - Preprocess training data",
-                "GET /api/utils/schema-requirements - Get schema requirements"
-            ],
-            "visualization": [
-                "GET /api/visualization/model-comparison-plot - Generate model comparison plot",
-                "GET /api/visualization/available-plots - List available plots"
-            ],
-            "database": [
-                "GET /api/database/tables - List database tables",
-                "POST /api/database/query - Execute SELECT query",
-                "GET /api/database/table-info/<table_name> - Get table information"
-            ],
-            "product": [
-                "POST /api/product/input - Handle product input and processing",
-                "POST /api/product/recommend-materials - AI material recommendation",
-                "POST /api/product/environmental-score - Environmental score computation"
-            ],
-            "security": [
-                "GET /api/security/health - Secure health check (requires API key)",
-                "POST /api/security/validate-key - Validate API key"
-            ]
-        }
+    # --------------------------------------------------
+    # 1. Validate RAW inputs strictly
+    # --------------------------------------------------
+    for field, expected_type in RAW_REQUIRED_FIELDS.items():
+        if field not in data:
+            return jsonify({
+                "status": "error",
+                "message": f"Missing required field: {field}"
+            }), 400
 
+        if not isinstance(data[field], expected_type):
+            return jsonify({
+                "status": "error",
+                "message": f"Invalid type for field: {field}"
+            }), 400
+
+    # --------------------------------------------------
+    # 2. Convert input to DataFrame
+    # --------------------------------------------------
+    df = pd.DataFrame([data])
+
+    # --------------------------------------------------
+    # 3. Derive dataset-approved features
+    # (same logic as training)
+    # --------------------------------------------------
+    try:
+        df = derive_features(df)
+    except Exception as e:
         return jsonify({
-            "status": "success",
-            "message": "Packaging Recommendation System API",
-            "endpoints": endpoints,
-            "security": {
-                "api_key_required": "Include 'X-API-Key' header with requests to secure endpoints",
-                "default_key": "packaging-api-key-2024 (set API_KEY environment variable for production)"
-            }
-        })
+            "status": "error",
+            "message": f"Feature engineering failed: {str(e)}"
+        }), 500
 
-    return app
+    # --------------------------------------------------
+    # 4. Model inference
+    # --------------------------------------------------
+    try:
+        result = model.recommend_materials(df)
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Model inference failed: {str(e)}"
+        }), 500
 
-app = create_app()
+    # --------------------------------------------------
+    # 5. Add explanations
+    # --------------------------------------------------
+    result["decision_summary"] = generate_explanations(df.iloc[0])
 
+    return jsonify(result), 200
+
+# --------------------------------------------------
+# Local run (ignored by Gunicorn on Render)
+# --------------------------------------------------
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
-    # from waitress import serve
-    # serve(app, host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=False
+    )

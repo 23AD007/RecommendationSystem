@@ -4,6 +4,10 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import io
+
+from reportlab.platypus import SimpleDocTemplate, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
 
 # --------------------------------------------------
 # PAGE CONFIG
@@ -15,7 +19,7 @@ st.set_page_config(
 )
 
 # --------------------------------------------------
-# CUSTOM THEME (UNIQUE – NOT STREAMLIT DEFAULT)
+# CUSTOM THEME
 # --------------------------------------------------
 st.markdown("""
 <style>
@@ -54,7 +58,7 @@ h1, h2, h3 {color: #D4A373;}
 """, unsafe_allow_html=True)
 
 # --------------------------------------------------
-# BACKEND CONFIG
+# BACKEND CONFIG (CHANGE AFTER DEPLOYMENT)
 # --------------------------------------------------
 BACKEND_URL = "http://localhost:5000/api/product/recommend-materials"
 API_KEY = "packaging-api-key-2024"
@@ -114,13 +118,18 @@ if st.button("🚀 Generate AI Recommendation", use_container_width=True):
     try:
         response = requests.post(BACKEND_URL, json=payload, headers=headers, timeout=10)
         data = response.json()
-    except Exception as e:
-        st.error("❌ Backend not reachable. Make sure Flask is running.")
+    except Exception:
+        st.error("❌ Backend not reachable.")
         st.stop()
 
     if data.get("status") != "success":
         st.error(data.get("message", "Unknown backend error"))
         st.stop()
+
+    # --------------------------------------------------
+    # DATAFRAME
+    # --------------------------------------------------
+    rec_df = pd.DataFrame(data["recommendations"])
 
     # --------------------------------------------------
     # TABS
@@ -135,11 +144,9 @@ if st.button("🚀 Generate AI Recommendation", use_container_width=True):
     # TAB 1 – RECOMMENDATIONS
     # ==================================================
     with tab1:
-        confidence = data["confidence_score"]
-
         st.metric(
             "Overall Confidence Score",
-            f"{confidence*100:.1f}%"
+            f"{data['confidence_score']*100:.1f}%"
         )
 
         for rec in data["recommendations"]:
@@ -152,12 +159,10 @@ if st.button("🚀 Generate AI Recommendation", use_container_width=True):
             """, unsafe_allow_html=True)
 
     # ==================================================
-    # TAB 2 – BI DASHBOARD
+    # TAB 2 – BI DASHBOARD + DOWNLOADS
     # ==================================================
     with tab2:
-        rec_df = pd.DataFrame(data["recommendations"])
-
-        # ---- BAR CHART
+        # BAR CHART
         fig_bar = px.bar(
             rec_df,
             x="material",
@@ -166,14 +171,9 @@ if st.button("🚀 Generate AI Recommendation", use_container_width=True):
             template="plotly_dark",
             title="Material Confidence Comparison"
         )
-        fig_bar.update_layout(
-            paper_bgcolor="#0F172A",
-            plot_bgcolor="#0F172A",
-            font_color="#E5E7EB"
-        )
         st.plotly_chart(fig_bar, use_container_width=True)
 
-        # ---- RADAR (SPIDER)
+        # RADAR
         radar_labels = ["Sustainability","Durability","Cost Efficiency","Innovation"]
         radar_values = [
             sustainability_priority,
@@ -186,48 +186,73 @@ if st.button("🚀 Generate AI Recommendation", use_container_width=True):
         fig_radar.add_trace(go.Scatterpolar(
             r=radar_values + [radar_values[0]],
             theta=radar_labels + [radar_labels[0]],
-            fill="toself",
-            name="Product Profile"
+            fill="toself"
         ))
-        fig_radar.update_layout(
-            polar=dict(bgcolor="#0F172A"),
-            paper_bgcolor="#0F172A",
-            font_color="#E5E7EB",
-            title="Product Constraint Radar"
-        )
         st.plotly_chart(fig_radar, use_container_width=True)
 
-        # ---- HEATMAP
-        heat_df = pd.DataFrame({
-            "Factor": radar_labels,
-            "Score": radar_values
-        })
-
+        # HEATMAP
+        heat_df = pd.DataFrame({"Factor": radar_labels, "Score": radar_values})
         fig_heat = px.imshow(
             heat_df[["Score"]].T,
             x=heat_df["Factor"],
-            color_continuous_scale="Viridis",
             title="Constraint Influence Heatmap"
         )
-        fig_heat.update_layout(
-            paper_bgcolor="#0F172A",
-            font_color="#E5E7EB"
-        )
         st.plotly_chart(fig_heat, use_container_width=True)
+
+        # -------------------------
+        # EXCEL DOWNLOAD
+        # -------------------------
+        excel_buffer = io.BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+            rec_df.to_excel(writer, index=False, sheet_name="Recommendations")
+
+        st.download_button(
+            "📥 Download Excel Report",
+            data=excel_buffer.getvalue(),
+            file_name="packaging_recommendations.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+        # -------------------------
+        # PDF DOWNLOAD
+        # -------------------------
+        pdf_buffer = io.BytesIO()
+        doc = SimpleDocTemplate(pdf_buffer)
+        styles = getSampleStyleSheet()
+
+        content = [
+            Paragraph("AI Packaging Recommendation Report", styles["Title"]),
+            Paragraph(f"Product Category: {product_category}", styles["Normal"]),
+            Paragraph("<br/>", styles["Normal"]),
+        ]
+
+        for rec in data["recommendations"]:
+            content.append(
+                Paragraph(
+                    f"{rec['material']} — Confidence: {rec['confidence']}%",
+                    styles["Normal"]
+                )
+            )
+
+        doc.build(content)
+
+        st.download_button(
+            "📄 Download PDF Report",
+            data=pdf_buffer.getvalue(),
+            file_name="packaging_report.pdf",
+            mime="application/pdf"
+        )
 
     # ==================================================
     # TAB 3 – MODEL REASONING
     # ==================================================
     with tab3:
-        st.markdown("## 🧠 Why the AI made this decision")
-
         for k, v in data["decision_summary"].items():
             st.markdown(f"""
             <div class="card">
                 <strong>{k}</strong><br/>
-                <span style="color:#E5E7EB;">{v}</span>
+                <span>{v}</span>
             </div>
             """, unsafe_allow_html=True)
 
-        st.markdown("### 🔍 Model Metadata")
         st.json(data["model_info"])
