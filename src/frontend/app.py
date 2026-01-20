@@ -1,34 +1,33 @@
 import streamlit as st
-import requests
 import pandas as pd
-import matplotlib.pyplot as plt
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
-# --------------------------------------------------
-# APP CONFIG
-# --------------------------------------------------
+# ==================================================
+# CONFIG
+# ==================================================
 st.set_page_config(
     page_title="AI Packaging Recommendation System",
     layout="wide"
 )
 
-BACKEND_URL = "http://localhost:5000/api/product/recommend-materials"
-API_KEY = "packaging-api-key-2024"
+USE_MOCK_BACKEND = True  # ✅ REQUIRED FOR STREAMLIT CLOUD
 
-# --------------------------------------------------
+# ==================================================
 # HEADER
-# --------------------------------------------------
+# ==================================================
 st.title("📦 AI-Powered Packaging Recommendation System")
 st.caption(
-    "An explainable AI system for recommending sustainable packaging materials "
-    "with integrated sustainability and cost analytics."
+    "Explainable AI system for sustainable packaging recommendations "
+    "with integrated Business Intelligence analytics."
 )
 
-# --------------------------------------------------
-# SIDEBAR INPUTS
-# --------------------------------------------------
+tabs = st.tabs(["📦 Recommendations", "📊 BI Dashboard"])
+
+# ==================================================
+# INPUT SIDEBAR
+# ==================================================
 with st.sidebar:
     st.header("🧾 Product Inputs")
 
@@ -37,39 +36,67 @@ with st.sidebar:
         ["electronics", "food", "glassware", "pharmaceutical", "cosmetics", "household"]
     )
 
-    fragility_score = st.slider(
-        "Fragility Score", 0.0, 1.0, 0.8,
-        help="Higher value means more fragile product"
+    fragility_score = st.slider("Fragility", 0.0, 1.0, 0.7)
+    sustainability_priority = st.slider("Sustainability Priority", 0.0, 1.0, 0.8)
+    durability_requirement = st.slider("Durability Requirement", 0.0, 1.0, 0.6)
+
+    material_cost = st.number_input("Material Cost", value=40.0)
+    max_packaging_cost = st.number_input("Max Packaging Cost", value=100.0)
+    innovation_level = st.slider("Innovation Level", 0.0, 5.0, 3.0)
+
+    run = st.button("🚀 Run Recommendation", use_container_width=True)
+
+# ==================================================
+# MOCK BACKEND (STREAMLIT SAFE)
+# ==================================================
+def mock_backend(payload):
+    confidence = round(
+        0.35 * payload["sustainability_priority"]
+        + 0.30 * payload["fragility_score"]
+        + 0.20 * payload["durability_requirement"]
+        + 0.15 * (1 - payload["material_cost"] / payload["max_packaging_cost"]),
+        3
     )
 
-    sustainability_priority = st.slider(
-        "Sustainability Priority", 0.0, 1.0, 0.7
-    )
+    recommendations = [
+        {
+            "material": "Recycled Cardboard",
+            "confidence": round(confidence * 100, 1),
+            "reason": "High sustainability priority combined with low material cost"
+        },
+        {
+            "material": "Bamboo Fiber",
+            "confidence": round(confidence * 92, 1),
+            "reason": "Renewable material offering durability with eco-benefits"
+        },
+        {
+            "material": "Cork",
+            "confidence": round(confidence * 88, 1),
+            "reason": "Excellent shock absorption for fragile products"
+        }
+    ]
 
-    durability_requirement = st.slider(
-        "Durability Requirement", 0.0, 1.0, 0.6
-    )
+    decision_summary = {
+        "Sustainability Impact":
+            f"Sustainability priority ({payload['sustainability_priority']}) strongly influenced material choice.",
+        "Fragility Impact":
+            f"Fragility score ({payload['fragility_score']}) increased preference for cushioning materials.",
+        "Cost Constraint":
+            f"Material cost ({payload['material_cost']}) within budget ({payload['max_packaging_cost']}).",
+        "Innovation Influence":
+            f"Innovation level ({payload['innovation_level']}) supported modern eco-materials."
+    }
 
-    material_cost = st.number_input(
-        "Material Cost", min_value=0.0, value=40.0
-    )
+    return {
+        "confidence_score": confidence,
+        "recommendations": recommendations,
+        "decision_summary": decision_summary
+    }
 
-    max_packaging_cost = st.number_input(
-        "Max Packaging Cost", min_value=0.0, value=100.0
-    )
-
-    innovation_level = st.number_input(
-        "Innovation Level", min_value=0.0, value=3.0
-    )
-
-    run_btn = st.button("🚀 Get Recommendation")
-
-# --------------------------------------------------
-# TABS
-# --------------------------------------------------
-tab_rec, tab_bi = st.tabs(["📦 Recommendations", "📊 BI Dashboard"])
-
-if run_btn:
+# ==================================================
+# RUN PIPELINE
+# ==================================================
+if run:
     payload = {
         "product_category": product_category,
         "fragility_score": fragility_score,
@@ -80,186 +107,120 @@ if run_btn:
         "innovation_level": innovation_level
     }
 
-    headers = {"X-API-Key": API_KEY}
+    data = mock_backend(payload)
 
-    response = requests.post(
-        BACKEND_URL,
-        json=payload,
-        headers=headers,
-        timeout=10
-    )
-
-    if response.status_code != 200:
-        st.error(response.text)
-        st.stop()
-
-    data = response.json()
+    rec_df = pd.DataFrame(data["recommendations"])
 
     # ==================================================
-    # TAB 1 — RECOMMENDATIONS + REASONING
+    # TAB 1 — RECOMMENDATIONS
     # ==================================================
-    with tab_rec:
-        confidence = data["confidence_score"]
+    with tabs[0]:
+        st.subheader("✅ Recommendation Confidence")
+        st.metric("Overall Confidence", f"{data['confidence_score']*100:.1f}%")
 
-        st.metric(
-            "Overall Confidence Score",
-            f"{confidence * 100:.1f}%"
-        )
-
-        # -------------------------------
-        # STRONG HUMAN-READABLE REASONING
-        # -------------------------------
         st.subheader("🧠 Why this recommendation?")
+        for k, v in data["decision_summary"].items():
+            st.info(f"**{k}** — {v}")
 
-        reasoning_map = {
-            "Fragility": "High fragility increases the need for protective packaging materials.",
-            "Sustainability": "Higher sustainability priority favors eco-friendly materials.",
-            "Cost": "Cost constraints limit the selection of premium materials.",
-            "Durability": "Durability requirements influence material strength and longevity.",
-            "Innovation": "Innovation preference promotes modern, alternative materials."
-        }
-
-        decision_summary = data.get("decision_summary", {})
-
-        if decision_summary:
-            for feature, _ in decision_summary.items():
-                explanation = "Balanced contribution to the final decision."
-                for key, text in reasoning_map.items():
-                    if key.lower() in feature.lower():
-                        explanation = text
-                st.write(f"• **{feature}** — {explanation}")
-        else:
-            st.info(
-                "The model arrived at this decision based on an overall balance "
-                "of product constraints without a dominant factor."
-            )
-
-        # -------------------------------
-        # MATERIAL RECOMMENDATIONS
-        # -------------------------------
         st.subheader("📦 Recommended Materials")
-
-        for rec in data["recommendations"]:
-            with st.container():
-                st.markdown(f"### {rec['material']}")
-                st.write(f"**Confidence:** {rec['confidence']}%")
-                st.caption(rec["reason"])
-                st.divider()
+        for _, r in rec_df.iterrows():
+            st.markdown(
+                f"""
+                **{r['material']}**  
+                Confidence: **{r['confidence']}%**  
+                _{r['reason']}_
+                """
+            )
+            st.divider()
 
     # ==================================================
     # TAB 2 — BI DASHBOARD
     # ==================================================
-    with tab_bi:
+    with tabs[1]:
         st.subheader("📊 Business Intelligence Dashboard")
 
-        rec_df = pd.DataFrame(data["recommendations"])
+        col1, col2 = st.columns(2)
 
-        # -------------------------------
-        # Synthetic BI Metrics (Industry Assumptions)
-        # -------------------------------
-        BI_METRICS = {
-            "Recycled Cardboard": [85, 70, 80],
-            "Bamboo Fiber": [90, 65, 75],
-            "Hemp Fiber": [88, 60, 78],
-            "Cork": [70, 55, 85],
-            "Sustainable Composite": [75, 68, 82],
-            "Biodegradable Plastic": [65, 50, 70],
-            "Review Requirements": [40, 30, 40]
-        }
-
-        metric_labels = [
-            "CO₂ Reduction (%)",
-            "Cost Savings (%)",
-            "Durability Index"
-        ]
-
-        bi_rows = []
-        for mat in rec_df["material"]:
-            co2, cost, dur = BI_METRICS.get(mat, [50, 50, 50])
-            bi_rows.append([mat, co2, cost, dur])
-
-        bi_df = pd.DataFrame(
-            bi_rows,
-            columns=["Material"] + metric_labels
-        )
-
-        # ==================================================
-        # 🕸 INTERACTIVE RADAR (SPIDER) CHART
-        # ==================================================
-        st.markdown("### 🕸 Material Performance Radar")
-
-        selected_material = st.selectbox(
-            "Select material",
-            bi_df["Material"]
-        )
-
-        radar_values = bi_df[
-            bi_df["Material"] == selected_material
-        ][metric_labels].values.flatten().tolist()
-
-        radar_fig = go.Figure(
-            data=go.Scatterpolar(
-                r=radar_values,
-                theta=metric_labels,
+        # ---------- Radar (Spider) ----------
+        with col1:
+            radar_fig = go.Figure()
+            radar_fig.add_trace(go.Scatterpolar(
+                r=[
+                    sustainability_priority,
+                    durability_requirement,
+                    1 - material_cost / max_packaging_cost,
+                    fragility_score
+                ],
+                theta=[
+                    "Sustainability",
+                    "Durability",
+                    "Cost Efficiency",
+                    "Fragility"
+                ],
                 fill="toself",
-                name=selected_material
+                name="Product Profile"
+            ))
+            radar_fig.update_layout(height=380)
+            st.plotly_chart(radar_fig, use_container_width=True)
+
+        # ---------- Heatmap ----------
+        with col2:
+            heatmap_data = np.array([
+                [sustainability_priority, durability_requirement],
+                [fragility_score, 1 - material_cost / max_packaging_cost]
+            ])
+
+            heatmap_fig = px.imshow(
+                heatmap_data,
+                labels=dict(x="Factors", y="Metrics", color="Impact"),
+                x=["Sustainability", "Durability"],
+                y=["Fragility", "Cost Efficiency"],
+                color_continuous_scale="Viridis"
             )
+            heatmap_fig.update_layout(height=380)
+            st.plotly_chart(heatmap_fig, use_container_width=True)
+
+        st.divider()
+
+        # ---------- CO₂ Reduction ----------
+        st.subheader("🌱 Sustainability Impact")
+
+        co2_df = pd.DataFrame({
+            "Material": rec_df["material"],
+            "CO₂ Reduction (%)": [28, 35, 22]
+        })
+
+        st.plotly_chart(
+            px.bar(co2_df, x="Material", y="CO₂ Reduction (%)", height=350),
+            use_container_width=True
         )
 
-        radar_fig.update_layout(
-            polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-            showlegend=False,
-            height=400
+        # ---------- Cost Savings ----------
+        cost_df = pd.DataFrame({
+            "Material": rec_df["material"],
+            "Cost Savings (%)": [18, 12, 9]
+        })
+
+        st.plotly_chart(
+            px.bar(cost_df, x="Material", y="Cost Savings (%)", height=350),
+            use_container_width=True
         )
 
-        st.plotly_chart(radar_fig, use_container_width=True)
+        # ---------- Material Usage Trends ----------
+        trend_df = pd.DataFrame({
+            "Year": ["2021", "2022", "2023", "2024"],
+            "Recycled Cardboard": [40, 48, 55, 63],
+            "Bamboo Fiber": [20, 28, 36, 45],
+            "Cork": [15, 18, 22, 26]
+        })
 
-        # ==================================================
-        # 🔥 INTERACTIVE HEATMAP
-        # ==================================================
-        st.markdown("### 🔥 Sustainability & Cost Heatmap")
-
-        heatmap_fig = px.imshow(
-            bi_df.set_index("Material"),
-            color_continuous_scale="YlGn",
-            aspect="auto"
+        st.plotly_chart(
+            px.line(
+                trend_df,
+                x="Year",
+                y=trend_df.columns[1:],
+                markers=True,
+                height=380
+            ),
+            use_container_width=True
         )
-
-        heatmap_fig.update_layout(height=350)
-        st.plotly_chart(heatmap_fig, use_container_width=True)
-
-        # ==================================================
-        # 📊 CO₂ vs COST SAVINGS (GROUPED BAR)
-        # ==================================================
-        st.markdown("### 📊 CO₂ Reduction vs Cost Savings")
-
-        bar_fig = px.bar(
-            bi_df,
-            x="Material",
-            y=["CO₂ Reduction (%)", "Cost Savings (%)"],
-            barmode="group",
-            height=350
-        )
-
-        bar_fig.update_layout(xaxis_tickangle=-30)
-        st.plotly_chart(bar_fig, use_container_width=True)
-
-        # ==================================================
-        # 📈 CONFIDENCE TREND (INTERACTIVE)
-        # ==================================================
-        st.markdown("### 📈 Recommendation Confidence Trend")
-
-        trend_fig = px.line(
-            rec_df,
-            x="material",
-            y="confidence",
-            markers=True,
-            height=350
-        )
-
-        trend_fig.update_layout(
-            yaxis_title="Confidence (%)",
-            xaxis_title="Material"
-        )
-
-        st.plotly_chart(trend_fig, use_container_width=True)
