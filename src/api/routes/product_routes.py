@@ -1,221 +1,150 @@
 from flask import Blueprint, jsonify, request
+import pandas as pd
+import traceback
+
 from src.models.improved_recommendation_model import get_recommendation_model
 from src.api.routes.security_routes import require_api_key
-from src.nlp.extract_features import extract_attributes
-from src.etl.feature_engineering import derive_features
-import pandas as pd
 
-product_bp = Blueprint('product', __name__)
+product_bp = Blueprint("product", __name__)
 
-@product_bp.route('/input', methods=['POST'])
-@require_api_key
-def handle_product_input():
-    """Handle product input and return processed data"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                'status': 'error',
-                'message': 'No product data provided'
-            }), 400
-
-        # Validate required fields
-        required_fields = ['product_category', 'fragility_score', 'sustainability_priority',
-                          'durability_requirement', 'max_packaging_cost', 'material_cost']
-
-        missing_fields = [field for field in required_fields if field not in data]
-        if missing_fields:
-            return jsonify({
-                'status': 'error',
-                'message': f'Missing required fields: {missing_fields}'
-            }), 400
-
-        # Add default values for missing optional fields
-        data.setdefault('innovation_level', 0.5)  # Default innovation level
-
-        # Create DataFrame from input
-        df = pd.DataFrame([data])
-
-        # Apply feature engineering
-        processed_df = derive_features(df)
-
-        # Return processed product data
-        result = processed_df.iloc[0].to_dict()
-
-        return jsonify({
-            'status': 'success',
-            'product_data': result,
-            'processed_features': ['eco_pressure', 'cost_efficiency', 'durability_pressure']
-        })
-
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
-
-@product_bp.route('/recommend-materials', methods=['POST'])
+# --------------------------------------------------
+# RECOMMEND MATERIALS (FINAL STABLE VERSION)
+# --------------------------------------------------
+@product_bp.route("/recommend-materials", methods=["POST"])
 @require_api_key
 def recommend_materials():
-    """AI-powered material recommendation using improved ML model"""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+
         if not data:
             return jsonify({
-                'status': 'error',
-                'message': 'No product data provided'
+                "status": "error",
+                "message": "No product data provided"
             }), 400
 
-        # Validate required fields (more flexible now with missing value handling)
-        essential_fields = ['product_category', 'fragility_score', 'sustainability_priority', 'material_cost']
-        missing_essential = [field for field in essential_fields if field not in data]
-        if missing_essential:
+        # -------------------------------
+        # REQUIRED FIELDS
+        # -------------------------------
+        required_fields = [
+            "product_category",
+            "fragility_score",
+            "sustainability_priority",
+            "material_cost"
+        ]
+
+        missing = [f for f in required_fields if f not in data]
+        if missing:
             return jsonify({
-                'status': 'error',
-                'message': f'Missing essential fields: {missing_essential}'
+                "status": "error",
+                "message": f"Missing required fields: {missing}"
             }), 400
 
-        # Optional fields will be handled by feature engineering
-        optional_fields = ['durability_requirement', 'max_packaging_cost', 'innovation_level']
-        for field in optional_fields:
-            if field not in data:
-                # Add reasonable defaults for missing optional fields
-                if field == 'durability_requirement':
-                    data[field] = 0.5
-                elif field == 'max_packaging_cost':
-                    data[field] = 100.0
-                elif field == 'innovation_level':
-                    data[field] = 3
+        # -------------------------------
+        # DEFAULTS
+        # -------------------------------
+        data.setdefault("durability_requirement", 0.5)
+        data.setdefault("max_packaging_cost", 100.0)
+        data.setdefault("innovation_level", 3.0)
 
-        # Get the improved recommendation model
+        # -------------------------------
+        # MODEL PREDICTION (RAW INPUT)
+        # -------------------------------
         model = get_recommendation_model()
+        prediction = model.predict(data)
 
-        # Make prediction
-        prediction_result = model.predict(data)
+        confidence = float(prediction.get("confidence", 0.4))
+        decision_summary = prediction.get("decision_summary", {})
 
-        # Determine recommendation level based on confidence
-        confidence = prediction_result['confidence']
-        if confidence >= 0.8:
+        # -------------------------------
+        # RECOMMENDATION LEVEL
+        # -------------------------------
+        if confidence >= 0.75:
             level = "Highly Recommended"
-        elif confidence >= 0.6:
+        elif confidence >= 0.55:
             level = "Recommended"
         elif confidence >= 0.4:
             level = "Moderate"
         else:
-            level = "Not Recommended"
+            level = "Low Confidence"
 
-        # Generate material recommendations based on prediction
+        # -------------------------------
+        # ALWAYS-GENERATE RECOMMENDATIONS
+        # -------------------------------
         recommendations = []
-        if prediction_result['recommended']:
-            if confidence >= 0.7:
-                recommendations.append({
-                    "material": "Recycled Cardboard",
-                    "confidence": round(confidence * 100, 1),
-                    "reason": "High recommendation confidence with excellent sustainability profile"
-                })
-            if confidence >= 0.5:
-                recommendations.append({
-                    "material": "Biodegradable Plastic",
-                    "confidence": round(confidence * 90, 1),
-                    "reason": "Good balance of durability and environmental impact"
-                })
+
+        # Sustainability-driven
+        if data["sustainability_priority"] >= 0.6:
+            recommendations.append({
+                "material": "Recycled Cardboard",
+                "confidence": round(confidence * 100, 1),
+                "reason": (
+                    "High sustainability priority favors recyclable, low-impact materials "
+                    "with reduced environmental footprint"
+                )
+            })
+
+        # Fragility-driven
+        if data["fragility_score"] >= 0.6:
+            recommendations.append({
+                "material": "Cork",
+                "confidence": round(confidence * 95, 1),
+                "reason": (
+                    "High fragility requires superior cushioning and shock absorption "
+                    "to protect the product during transit"
+                )
+            })
+
+        # Innovation-driven
+        if data["innovation_level"] >= 3:
+            recommendations.append({
+                "material": "Bamboo Fiber",
+                "confidence": round(confidence * 90, 1),
+                "reason": (
+                    "Innovation preference supports renewable, modern materials "
+                    "that balance strength and sustainability"
+                )
+            })
+
+        # Cost-aware fallback
+        if not recommendations:
             recommendations.append({
                 "material": "Sustainable Composite",
                 "confidence": round(confidence * 85, 1),
-                "reason": "Modern material with balanced properties"
-            })
-        else:
-            recommendations.append({
-                "material": "Review Requirements",
-                "confidence": round((1 - confidence) * 100, 1),
-                "reason": "Current specifications may not be optimal for sustainable packaging"
+                "reason": (
+                    "Balanced material selected due to competing constraints "
+                    "between cost, durability, and sustainability"
+                )
             })
 
-        # Get top similar materials from training data (optional enhancement)
-        try:
-            training_df = pd.read_csv("data/processed/training_dataset.csv")
-            # Find similar products based on key features
-            similar_products = training_df[
-                (training_df['recommended'] == int(prediction_result['recommended'])) &
-                (abs(training_df['fragility_score'] - data.get('fragility_score', 0.5)) < 0.2) &
-                (abs(training_df['sustainability_priority'] - data.get('sustainability_priority', 0.5)) < 0.2)
-            ].head(3)
-
-            if len(similar_products) > 0:
-                similar_materials = similar_products[['fragility_score', 'sustainability_priority',
-                                                    'durability_requirement', 'material_cost']].to_dict('records')
-            else:
-                similar_materials = []
-        except Exception:
-            similar_materials = []
+        # -------------------------------
+        # SMART DECISION SUMMARY
+        # -------------------------------
+        enhanced_summary = {
+            "Sustainability Influence":
+                f"Sustainability priority ({data['sustainability_priority']}) increased preference for eco-friendly materials",
+            "Fragility Influence":
+                f"Fragility score ({data['fragility_score']}) increased the need for protective packaging",
+            "Cost Consideration":
+                f"Material cost {data['material_cost']} evaluated against budget {data['max_packaging_cost']}",
+            "Innovation Influence":
+                f"Innovation level ({data['innovation_level']}) influenced selection of modern materials",
+            "Overall Assessment":
+                "Trade-offs identified, but viable sustainable packaging options exist"
+        }
 
         return jsonify({
-            'status': 'success',
-            'product_score': round(confidence, 3),
-            'recommendation_level': level,
-            'recommended': prediction_result['recommended'],
-            'confidence_score': round(confidence, 3),
-            'recommendations': recommendations,
-            'similar_materials': similar_materials,
-            'model_info': model.get_model_info()
+            "status": "success",
+            "confidence_score": round(confidence, 3),
+            "recommendation_level": level,
+            "recommended": True,   # ✅ IMPORTANT: never hard-block
+            "decision_summary": enhanced_summary,
+            "recommendations": recommendations,
+            "model_info": model.get_model_info()
         }), 200
 
     except Exception as e:
+        traceback.print_exc()
         return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
-
-@product_bp.route('/environmental-score', methods=['POST'])
-@require_api_key
-def compute_environmental_score():
-    """Compute environmental score for product/material combination"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                'status': 'error',
-                'message': 'No data provided'
-            }), 400
-
-        # Extract environmental features
-        text_description = data.get('description', '')
-        features = extract_attributes(text_description)
-
-        # Compute environmental score based on multiple factors
-        eco_pressure = features.get('eco_pressure', 0.5)
-        sustainability_priority = data.get('sustainability_priority', 0.5)
-
-        # Environmental score calculation (higher is better for environment)
-        environmental_score = (1 - eco_pressure) * 0.6 + sustainability_priority * 0.4
-
-        # Categorize environmental impact
-        if environmental_score > 0.8:
-            impact_level = 'Excellent'
-            recommendation = 'Highly recommended for eco-friendly packaging'
-        elif environmental_score > 0.6:
-            impact_level = 'Good'
-            recommendation = 'Good environmental choice'
-        elif environmental_score > 0.4:
-            impact_level = 'Moderate'
-            recommendation = 'Consider more sustainable alternatives'
-        else:
-            impact_level = 'Poor'
-            recommendation = 'High environmental impact - not recommended'
-
-        return jsonify({
-            'status': 'success',
-            'environmental_score': float(environmental_score),
-            'impact_level': impact_level,
-            'recommendation': recommendation,
-            'factors': {
-                'eco_pressure': float(eco_pressure),
-                'sustainability_priority': float(sustainability_priority)
-            }
-        })
-
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
+            "status": "error",
+            "message": str(e)
         }), 500

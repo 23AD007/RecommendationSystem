@@ -1,0 +1,22 @@
+artifact_path: file:D:/INTERNSHIP_CODE/Packaging-Recommendation-System/mlruns/14/models/m-80b35b39cbab405ea16fd648e973c3b4/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.12.10
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.8.0
+mlflow_version: 3.8.0
+model_id: m-80b35b39cbab405ea16fd648e973c3b4
+model_size_bytes: 1044
+model_uuid: m-80b35b39cbab405ea16fd648e973c3b4
+prompts: null
+run_id: 0fd28809597c41c0a4f2a23b6da46648
+utc_time_created: '2025-12-24 09:42:29.332892'

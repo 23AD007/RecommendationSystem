@@ -1,0 +1,1 @@
+Missing columns: {'recommended', 'innovation_level'}

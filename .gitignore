@@ -1,6 +1,17 @@
-.venv/
+# Python
 __pycache__/
 *.pyc
-mlruns/
+
+# Virtual environment
+.venv/
+venv/
+
+# ML models
+models/*.pkl
+
+# Environment variables
 .env
-data/raw/
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,22 @@
+artifact_path: file:D:/INTERNSHIP_CODE/Packaging-Recommendation-System/mlruns/11/models/m-4bfe8428eaaa4892a057e548ceb34285/artifacts
+flavors:
+  python_function:
+    data: model.ubj
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.xgboost
+    python_version: 3.12.10
+  xgboost:
+    code: null
+    data: model.ubj
+    model_class: xgboost.core.Booster
+    model_format: ubj
+    xgb_version: 3.1.2
+mlflow_version: 3.8.0
+model_id: m-4bfe8428eaaa4892a057e548ceb34285
+model_size_bytes: 686064
+model_uuid: m-4bfe8428eaaa4892a057e548ceb34285
+prompts: null
+run_id: 06705401627043b5bbe04867cf4a8cab
+utc_time_created: '2025-12-24 08:35:43.905835'

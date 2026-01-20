@@ -1,0 +1,15 @@
+artifact_uri: file:///D:/INTERNSHIP_CODE/Packaging-Recommendation-System/mlruns/409227391092358972/2e0ff0dc76fa49bab1d17901dc1088ef/artifacts
+end_time: 1767789388648
+entry_point_name: ''
+experiment_id: '409227391092358972'
+lifecycle_stage: active
+run_id: 2e0ff0dc76fa49bab1d17901dc1088ef
+run_name: Random_Forest
+run_uuid: 2e0ff0dc76fa49bab1d17901dc1088ef
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1767789382696
+status: 3
+tags: []
+user_id: PCV

@@ -1,0 +1,15 @@
+artifact_uri: file:///D:/INTERNSHIP_CODE/Packaging-Recommendation-System/mlruns/409227391092358972/cc5ee0dddbcb4e48869c79aba2023d03/artifacts
+end_time: 1767789396650
+entry_point_name: ''
+experiment_id: '409227391092358972'
+lifecycle_stage: active
+run_id: cc5ee0dddbcb4e48869c79aba2023d03
+run_name: XGBoost
+run_uuid: cc5ee0dddbcb4e48869c79aba2023d03
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1767789390947
+status: 3
+tags: []
+user_id: PCV

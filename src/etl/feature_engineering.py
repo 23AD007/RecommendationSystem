@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
 
-
+# ------------------------------------------------------------------
+# Core features expected by the ML models
+# ------------------------------------------------------------------
 CORE_FEATURES = [
     "eco_pressure",
     "cost_efficiency",
@@ -14,36 +16,74 @@ CORE_FEATURES = [
     "sustainability_priority",
 ]
 
+# ------------------------------------------------------------------
+# Feature Engineering Function
+# ------------------------------------------------------------------
+def derive_features(
+    df: pd.DataFrame,
+    impute_strategy: str = "median",
+    **kwargs
+) -> pd.DataFrame:
+    """
+    Derive and preprocess features for packaging recommendation models.
 
-def derive_features(df: pd.DataFrame) -> pd.DataFrame:
+    Parameters:
+    - df: Input DataFrame containing raw product features
+    - impute_strategy: Strategy to handle missing values
+      ("mean", "median", "zero")
+
+    Returns:
+    - DataFrame with engineered and cleaned features
+    """
+
     df = df.copy()
 
-    # --- eco_pressure ---
+    # -------------------------------
+    # eco_pressure
+    # -------------------------------
     if "eco_pressure" not in df.columns:
         df["eco_pressure"] = 1 - df["sustainability_priority"]
 
-    # --- cost_efficiency ---
+    # -------------------------------
+    # cost_efficiency
+    # -------------------------------
     if "cost_efficiency" not in df.columns:
         df["cost_efficiency"] = 1 - (
             df["material_cost"] / df["max_packaging_cost"]
         )
 
-    # --- durability_pressure ---
+    # -------------------------------
+    # durability_pressure
+    # -------------------------------
     if "durability_pressure" not in df.columns:
         df["durability_pressure"] = (
             df["fragility_score"] / df["durability_requirement"]
         )
 
-    # Replace inf / NaN
+    # -------------------------------
+    # Replace inf / -inf with NaN
+    # -------------------------------
     df[CORE_FEATURES] = df[CORE_FEATURES].replace(
         [np.inf, -np.inf], np.nan
     )
 
-    df[CORE_FEATURES] = df[CORE_FEATURES].apply(
-        lambda c: c.fillna(c.median())
-    )
+    # -------------------------------
+    # Missing value imputation
+    # -------------------------------
+    if impute_strategy == "mean":
+        df[CORE_FEATURES] = df[CORE_FEATURES].apply(
+            lambda c: c.fillna(c.mean())
+        )
+    elif impute_strategy == "zero":
+        df[CORE_FEATURES] = df[CORE_FEATURES].fillna(0)
+    else:  # default = median
+        df[CORE_FEATURES] = df[CORE_FEATURES].apply(
+            lambda c: c.fillna(c.median())
+        )
 
-    # Clamp normalized features
+    # -------------------------------
+    # Clamp normalized features to [0, 1]
+    # -------------------------------
     for col in ["eco_pressure", "cost_efficiency", "durability_pressure"]:
         df[col] = df[col].clip(0, 1)
 

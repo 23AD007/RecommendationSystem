@@ -1,0 +1,1 @@
+Missing columns: {'material_cost', 'fragility_score', 'max_packaging_cost', 'durability_requirement', 'sustainability_priority'}

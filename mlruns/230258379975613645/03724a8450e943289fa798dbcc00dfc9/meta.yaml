@@ -1,0 +1,15 @@
+artifact_uri: file:///D:/INTERNSHIP_CODE/Packaging-Recommendation-System/mlruns/230258379975613645/03724a8450e943289fa798dbcc00dfc9/artifacts
+end_time: 1767869256789
+entry_point_name: ''
+experiment_id: '230258379975613645'
+lifecycle_stage: active
+run_id: 03724a8450e943289fa798dbcc00dfc9
+run_name: xgb_regressor
+run_uuid: 03724a8450e943289fa798dbcc00dfc9
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1767869246610
+status: 4
+tags: []
+user_id: PCV
