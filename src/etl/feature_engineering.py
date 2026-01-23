@@ -68,18 +68,9 @@ def derive_features(
     )
 
     # -------------------------------
-    # Missing value imputation
+    # Skip imputation - let XGBoost handle missing values
     # -------------------------------
-    if impute_strategy == "mean":
-        df[CORE_FEATURES] = df[CORE_FEATURES].apply(
-            lambda c: c.fillna(c.mean())
-        )
-    elif impute_strategy == "zero":
-        df[CORE_FEATURES] = df[CORE_FEATURES].fillna(0)
-    else:  # default = median
-        df[CORE_FEATURES] = df[CORE_FEATURES].apply(
-            lambda c: c.fillna(c.median())
-        )
+    pass
 
     # -------------------------------
     # Clamp normalized features to [0, 1]

@@ -125,6 +125,11 @@ def main():
             model.get_booster(),
             artifact_path="xgboost_model"
         )
+
+        # Save model locally for inference
+        import joblib
+        joblib.dump(model, "models/xgb_regressor.pkl")
+        print("✅ Regressor model saved locally")
                 # --------------------------------------------------
         # Learn material–product affinity
         # --------------------------------------------------

@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 import pandas as pd
 import traceback
 
-from src.models.improved_recommendation_model import get_recommendation_model
+from src.models.improved_recommendation_model import ImprovedRecommendationModel, FallbackRecommendationModel
 from src.api.routes.security_routes import require_api_key
 from src.etl.feature_engineering import derive_features
 
@@ -56,11 +56,21 @@ def recommend_materials():
         # -----------------------------
         # MODEL PREDICTION
         # -----------------------------
-        model = get_recommendation_model()
-        prediction = model.predict(df_features)
+        # Try XGBoost first
+        try:
+            xgb_model = ImprovedRecommendationModel()
+            xgb_prediction = xgb_model.predict(df_features)
+            # Always use the real model unless it fails
+            model = xgb_model
+            prediction = xgb_prediction
+        except Exception as e:
+            # Fallback to heuristic model
+            model = FallbackRecommendationModel()
+            prediction = model.predict(df_features)
 
         confidence = float(prediction["confidence"])
-        recommended = bool(prediction["recommended"])
+        # Determine recommended based on confidence threshold
+        recommended = confidence >= 0.5
         decision_summary = prediction.get("decision_summary", {})
 
         # -----------------------------
@@ -139,14 +149,16 @@ def recommend_materials():
         # -----------------------------
         # FINAL RESPONSE
         # -----------------------------
+        model_type = model.get_model_info().get("model", "unknown")
         return jsonify({
             "status": "success",
             "confidence_score": round(confidence, 3),
             "recommendation_level": level,
             "recommended": recommended,
-            "decision_summary": decision_summary,   # ✅ EXPLAINABILITY
+            "decision_summary": decision_summary,   # EXPLAINABILITY
             "recommendations": recommendations,
-            "model_info": model.get_model_info()
+            "model_info": model.get_model_info(),
+            "model_used": model_type
         }), 200
 
     except Exception as e:
@@ -155,3 +167,8 @@ def recommend_materials():
             "status": "error",
             "message": str(e)
         }), 500
+
+@product_bp.route("/product/recommend-materials", methods=["POST"])
+@require_api_key
+def recommend_materials_alias():
+    return recommend_materials()

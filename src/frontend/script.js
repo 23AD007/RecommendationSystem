@@ -15,9 +15,12 @@ async function getRecommendation() {
             innovation_level: parseFloat(document.getElementById("innovation").value)
         };
 
-        const response = await fetch("http://localhost:5000/api/product/recommend-materials", {
+        const response = await fetch("http://localhost:5000/api/recommend-materials", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                "X-API-Key": "packaging-api-key-2024"
+            },
             body: JSON.stringify(payload)
         });
 
@@ -43,20 +46,26 @@ function displayResults(data) {
 
     materialsDiv.innerHTML = '';
 
+    // Display model info
+    const modelInfo = data.model_info || {};
+    const modelDiv = document.createElement('div');
+    modelDiv.className = 'model-info';
+    modelDiv.innerHTML = `<strong>Model Used:</strong> ${modelInfo.model || 'Unknown'} (${modelInfo.confidence_source || ''})`;
+    materialsDiv.appendChild(modelDiv);
+
     if (data.recommendations && data.recommendations.length > 0) {
         data.recommendations.forEach(material => {
             const materialDiv = document.createElement('div');
             materialDiv.className = 'material-item';
             materialDiv.innerHTML = `
                 <strong>${material.material}</strong><br>
-                Score: ${(material.score * 100).toFixed(1)}%<br>
                 Confidence: ${material.confidence}%<br>
                 ${material.reason}
             `;
             materialsDiv.appendChild(materialDiv);
         });
     } else {
-        materialsDiv.innerHTML = '<p>No recommendations found.</p>';
+        materialsDiv.innerHTML += '<p>No recommendations found.</p>';
     }
 
     resultsDiv.style.display = 'block';

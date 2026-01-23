@@ -1,36 +1,52 @@
-import pandas as pd
+import os
+import joblib
 import numpy as np
-import mlflow
-import mlflow.xgboost
+import pandas as pd
 
-from xgboost import XGBRanker
+from xgboost import XGBRegressor
 from scipy.stats import spearmanr
 
 from src.etl.feature_engineering import derive_features, CORE_FEATURES
 
 
+# CONFIG
+DATA_PATH = "data/processed/training_dataset.csv"
+MODEL_DIR = "models"
+MODEL_PATH = os.path.join(MODEL_DIR, "xgb_ranker.pkl")
+
+
+# MAIN TRAINING PIPELINE
 def main():
-    # --------------------------------------------------
-    # 0.  DISABLE AUTOLOGGING
-    # --------------------------------------------------
-    
 
-    # --------------------------------------------------
-    # 1. Load training data
-    # --------------------------------------------------
-    df = pd.read_csv("data/processed/training_dataset.csv")
+    print("Loading training dataset...")
+    df = pd.read_csv(DATA_PATH)
 
-    print("Rows:", len(df))
-    print("Columns:", df.columns.tolist())
+    if df.empty:
+        raise ValueError("Training dataset is empty")
 
-    # --------------------------------------------------
-    # 2. Feature engineering (same as regressor)
-    # --------------------------------------------------
+    print(f"Rows: {len(df)}")
+    print(f"Columns: {list(df.columns)}")
+
+    # Filter out rows with too many missing values
+    # Keep only rows with at least 3 non-null values in key columns
+    key_columns = ['fragility_score', 'sustainability_priority', 'durability_requirement',
+                   'max_packaging_cost', 'material_cost', 'innovation_level']
+    df = df.dropna(subset=key_columns, thresh=3)  # At least 3 non-null
+    print(f"Rows after filtering sparse data: {len(df)}")
+
+    if df.empty:
+        raise ValueError("No valid training data after filtering")
+
+    # Feature Engineering (same as inference)
+    print("Applying feature engineering...")
     df = derive_features(df)
 
-    # --------------------------------------------------
-    # 3. Create relevance score
-    # --------------------------------------------------
+    # Fill NaN for relevance calculation
+    df[CORE_FEATURES] = df[CORE_FEATURES].fillna(0)
+
+    # Create relevance score (TARGET)
+    print("Creating relevance score...")
+
     df["relevance"] = (
         0.4 * (1 - df["eco_pressure"]) +
         0.3 * df["cost_efficiency"] +
@@ -38,30 +54,19 @@ def main():
     )
 
     if not np.isfinite(df["relevance"]).all():
-        raise ValueError("Relevance contains NaN or infinity")
+        raise ValueError("Relevance contains NaN or Inf values")
 
-    # --------------------------------------------------
-    # 4. Create TRUE query_id (ranking queries)
-    # --------------------------------------------------
+    # Query groups for ranking
     if "query_id" not in df.columns:
-        if "product_category" not in df.columns:
-            raise ValueError(
-                "Ranking requires 'product_category' or 'query_id'"
-            )
-
         df["query_id"] = (
             df["product_category"].astype(str) + "_" +
             df.index.astype(str)
         )
 
-    # --------------------------------------------------
-    # 5. Sort ONCE by query_id
-    # --------------------------------------------------
+    # IMPORTANT: Sort by query_id ONCE
     df = df.sort_values("query_id").reset_index(drop=True)
 
-    # --------------------------------------------------
-    # 6. Build X, y, and group from SAME df
-    # --------------------------------------------------
+    # Prepare training inputs
     X = df[CORE_FEATURES]
     y = df["relevance"]
 
@@ -72,51 +77,43 @@ def main():
         .tolist()
     )
 
-    assert sum(group_sizes) == len(df), (
-        f"Group mismatch: sum(groups)={sum(group_sizes)}, rows={len(df)}"
+    assert sum(group_sizes) == len(df), "Group sizes mismatch"
+
+    
+    # Train XGBoost Regressor
+    print("Training XGBoost Regressor...")
+
+    model = XGBRegressor(
+        n_estimators=300,
+        max_depth=6,
+        learning_rate=0.05,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        random_state=42
     )
 
-    # --------------------------------------------------
-    # 7. Train XGBoost Ranker
-    # --------------------------------------------------
-    mlflow.set_experiment("Packaging_XGBoost_Ranker")
+    model.fit(X, y)
 
-    with mlflow.start_run(run_name="xgb_ranker"):
-        model = XGBRanker(
-            objective="rank:pairwise",
-            n_estimators=300,
-            max_depth=6,
-            learning_rate=0.05,
-            subsample=0.8,
-            colsample_bytree=0.8,
-            random_state=42
-        )
+    # Evaluation (sanity check)
+    preds = model.predict(X)
 
-        model.fit(X, y, group=group_sizes)
-
-        # --------------------------------------------------
-        # 8. Evaluate (ONCE)
-        # --------------------------------------------------
-        preds = model.predict(X)
+    if np.std(preds) == 0:
+        print("Warning: Model predictions are constant")
+        spearman_corr = 0.0
+    else:
         spearman_corr, _ = spearmanr(y, preds)
+        spearman_corr = float(np.nan_to_num(spearman_corr))
 
-        # --------------------------------------------------
-        # 9. LOG METRIC EXACTLY ONCE (SAFE)
-        # --------------------------------------------------
-        mlflow.log_metric(
-            "spearman_rank_corr",
-            float(spearman_corr),
-            step=0
-        )
+    print(f"Spearman Rank Correlation: {spearman_corr:.4f}")
 
-        mlflow.xgboost.log_model(
-            model.get_booster(),
-            artifact_path="xgb_ranker"
-        )
+    # Save trained model
+    os.makedirs(MODEL_DIR, exist_ok=True)
+    joblib.dump(model, MODEL_PATH)
 
-        print("✅ XGBoost Ranker trained successfully")
-        print(f"Spearman Rank Corr: {spearman_corr:.4f}")
+    print(f"Model saved to: {MODEL_PATH}")
+    print("Training complete")
 
 
+# ENTRY POINT
 if __name__ == "__main__":
     main()

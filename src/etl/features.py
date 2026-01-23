@@ -10,5 +10,4 @@ CORE_FEATURES = [
     "max_packaging_cost",
     "durability_requirement",
     "sustainability_priority",
-    "product_category_encoded",
 ]

@@ -22,16 +22,16 @@ def main():
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
     )
-
+    #Configure MLflow
     mlflow.set_experiment("Packaging_RF_Classifier")
 
     with mlflow.start_run(run_name="random_forest"):
         model = RandomForestClassifier(
-            n_estimators=300,
-            max_depth=12,
-            random_state=42
+            n_estimators=300,    #number of trees
+            max_depth=12,        #maximum depth of each tree
+            random_state=42      #for reproducability
         )
-
+        #Train the model
         model.fit(X_train, y_train)
         preds = model.predict(X_test)
         preds_proba = model.predict_proba(X_test)[:, 1]
@@ -49,7 +49,7 @@ def main():
             "mae": mae,
             "r2": r2
         })
-
+        #Log the model to MLflow
         mlflow.sklearn.log_model(model, "rf_classifier")
 
         print("Random Forest trained successfully")

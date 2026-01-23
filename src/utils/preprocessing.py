@@ -6,9 +6,8 @@ from sklearn.preprocessing import LabelEncoder
 def load_and_prepare_data(csv_path: str):
     df = pd.read_csv(csv_path)
 
-    # --------------------------------------------------
+    
     # CREATE TARGET VARIABLE IF MISSING
-    # --------------------------------------------------
     if "overall_sustainability_score" not in df.columns:
         # Derive eco_pressure → inverse of sustainability priority
         if "sustainability_priority" in df.columns:
@@ -38,7 +37,7 @@ def load_and_prepare_data(csv_path: str):
     categorical_cols = ["product_category", "innovation_level"]
     for col in categorical_cols:
         if col in df.columns:
-            df[col] = LabelEncoder().fit_transform(df[col].astype(str))  # Handle NaN by converting to string
+            df[col] = LabelEncoder().fit_transform(df[col].astype(str))  # Handle NaN by converting to string (Label encoding)
 
     # Handle NaN values
     numeric_cols = df.select_dtypes(include=[np.number]).columns

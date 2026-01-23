@@ -21,7 +21,8 @@ st.set_page_config(
 # --------------------------------------------------
 # Backend API URL
 # --------------------------------------------------
-BACKEND_URL = "https://recommendationsystem-txbe.onrender.com/api/product/recommend-materials"
+# set to local backend when running locally
+BACKEND_URL = "http://localhost:5000/api/recommend-materials"
 
 # --------------------------------------------------
 # Title
@@ -75,7 +76,10 @@ if st.button("🚀 Generate AI Recommendation", use_container_width=True):
         response = requests.post(
             BACKEND_URL,
             json=payload,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "X-API-Key": "packaging-api-key-2024"
+            },
             timeout=15
         )
         data = response.json()
