@@ -1,13 +1,10 @@
-# Single source of truth for model features
-
 CORE_FEATURES = [
-    "eco_pressure",
-    "cost_efficiency",
-    "durability_pressure",
-    "innovation_level",
-    "material_cost",
+    "product_category_encoded",
     "fragility_score",
-    "max_packaging_cost",
     "durability_requirement",
     "sustainability_priority",
+    "innovation_level",
+    "material_cost",
+    "max_packaging_cost",
+    "cost_efficiency"
 ]

@@ -1,81 +1,43 @@
-import numpy as np
 import pandas as pd
+import numpy as np
 
-# ------------------------------------------------------------------
-# Core features expected by the ML models
-# ------------------------------------------------------------------
-CORE_FEATURES = [
-    "eco_pressure",
-    "cost_efficiency",
-    "durability_pressure",
-    "innovation_level",
-    "material_cost",
-    "fragility_score",
-    "max_packaging_cost",
-    "durability_requirement",
-    "sustainability_priority",
-]
+CATEGORY_MAP = {
+    "electronics": 0,
+    "food": 1,
+    "pharma": 2,
+    "fashion": 3,
+    "automotive": 4,
+}
 
-# ------------------------------------------------------------------
-# Feature Engineering Function
-# ------------------------------------------------------------------
-def derive_features(
-    df: pd.DataFrame,
-    impute_strategy: str = "median",
-    **kwargs
-) -> pd.DataFrame:
-    """
-    Derive and preprocess features for packaging recommendation models.
-
-    Parameters:
-    - df: Input DataFrame containing raw product features
-    - impute_strategy: Strategy to handle missing values
-      ("mean", "median", "zero")
-
-    Returns:
-    - DataFrame with engineered and cleaned features
-    """
-
+def derive_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
-    # -------------------------------
-    # eco_pressure
-    # -------------------------------
-    if "eco_pressure" not in df.columns:
-        df["eco_pressure"] = 1 - df["sustainability_priority"]
-
-    # -------------------------------
-    # cost_efficiency
-    # -------------------------------
-    if "cost_efficiency" not in df.columns:
-        df["cost_efficiency"] = 1 - (
-            df["material_cost"] / df["max_packaging_cost"]
-        )
-
-    # -------------------------------
-    # durability_pressure
-    # -------------------------------
-    if "durability_pressure" not in df.columns:
-        df["durability_pressure"] = (
-            df["fragility_score"] / df["durability_requirement"]
-        )
-
-    # -------------------------------
-    # Replace inf / -inf with NaN
-    # -------------------------------
-    df[CORE_FEATURES] = df[CORE_FEATURES].replace(
-        [np.inf, -np.inf], np.nan
+    # Encode category
+    df["product_category_encoded"] = (
+        df["product_category"]
+        .map(CATEGORY_MAP)
+        .fillna(-1)
+        .astype(int)
     )
 
-    # -------------------------------
-    # Skip imputation - let XGBoost handle missing values
-    # -------------------------------
-    pass
+    # Numeric safety
+    numeric_cols = [
+        "fragility_score",
+        "durability_requirement",
+        "sustainability_priority",
+        "innovation_level",
+        "material_cost",
+        "max_packaging_cost",
+    ]
 
-    # -------------------------------
-    # Clamp normalized features to [0, 1]
-    # -------------------------------
-    for col in ["eco_pressure", "cost_efficiency", "durability_pressure"]:
-        df[col] = df[col].clip(0, 1)
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+
+    # Derived features
+    df["cost_efficiency"] = df["material_cost"] / (df["max_packaging_cost"] + 1e-6)
+    df["eco_pressure"] = 1.0 - df["sustainability_priority"]
+    df["durability_pressure"] = (
+        df["fragility_score"] * df["durability_requirement"]
+    )
 
     return df

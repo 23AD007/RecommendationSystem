@@ -5,11 +5,11 @@ from sqlalchemy import create_engine
 
 # === UPDATE ONLY THESE VALUES === #
 DB_USER = "postgres"
-DB_PASSWORD = "ads@1234"      # your pgAdmin password
+DB_PASSWORD = "ads@1234"      
 DB_HOST = "localhost"
 DB_PORT = "5432"
-DB_NAME = "postgres"          # IMPORTANT: now using postgres DB
-# ================================ #
+DB_NAME = "postgres"          
+
 
 
 def get_engine():

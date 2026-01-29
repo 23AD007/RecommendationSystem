@@ -1,43 +1,56 @@
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
+from src.etl.feature_engineering import CORE_FEATURES
+from src.models.train_xgboost_ranker import predict_ranked_materials
 
-from src.utils.preprocessing import load_and_prepare_data
+# Alias for API compatibility
+rank_materials = predict_ranked_materials
 
-def rank_materials():
-    # Load and preprocess data
-    X, y = load_and_prepare_data("data/processed/training_dataset.csv")
 
-    # Train a quick model for ranking
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
+def rank_with_model(model, df):
+    """
+    Rank materials using trained XGBoost model.
+    Fails explicitly if features are missing.
+    """
+    df = df.copy()
 
-    model = RandomForestClassifier(
-        n_estimators=100,  # Quick training
-        random_state=42
-    )
+    missing = [c for c in CORE_FEATURES if c not in df.columns]
+    if missing:
+        raise ValueError(f"Missing features for model inference: {missing}")
 
-    model.fit(X_train, y_train)
+    X = df[CORE_FEATURES].copy()
+    df["score"] = model.predict(X)
 
-    # Load original data for ranking
-    df = pd.read_csv("data/processed/training_dataset.csv")
+    return df.sort_values("score", ascending=False)
 
-    # Predict scores on full dataset
-    scores = model.predict_proba(X)[:, 1]
 
-    df["recommendation_score"] = scores
+def rank_rule_based(df):
+    """
+    Feature-driven fallback model.
+    Uses ONLY features guaranteed from UI + feature_engineering.
+    """
+    df = df.copy()
 
-    ranked = df.sort_values("recommendation_score", ascending=False)
-
-    print(ranked[[
-        "product_category",
-        "recommendation_score",
-        "fragility_score",
+    required = [
         "sustainability_priority",
-        "durability_requirement"
-    ]].head(10))
+        "material_cost",
+        "max_packaging_cost",
+        "fragility_score",
+        "durability_requirement",
+        "innovation_level"
+    ]
 
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise ValueError(f"Missing features for fallback ranking: {missing}")
 
-if __name__ == "__main__":
-    rank_materials()
+    cost_ratio = df["material_cost"] / (df["max_packaging_cost"] + 1e-6)
+
+    df["score"] = (
+        0.35 * df["sustainability_priority"]
+        + 0.25 * (1 - cost_ratio)
+        + 0.20 * (1 - df["fragility_score"])
+        + 0.15 * df["durability_requirement"]
+        + 0.05 * (df["innovation_level"] / 5.0)
+    )
+
+    return df.sort_values("score", ascending=False)

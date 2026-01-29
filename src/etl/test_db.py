@@ -1,4 +1,4 @@
-from src.ecopackdb.db_connect import get_engine
+from ecopackdb.db_connect import get_engine
 import pandas as pd
 
 try:
@@ -13,29 +13,19 @@ except Exception as e:
     print("Connection Failed:")
     print(e)
 from sqlalchemy import create_engine
-import pandas as pd
-from urllib.parse import quote_plus
-import os
 from dotenv import load_dotenv
+import os
 
-# Load environment variables from .env
 load_dotenv()
 
-# Get values from .env
-USER = os.getenv("DB_USER")
-PASSWORD = os.getenv("DB_PASSWORD")
-HOST = os.getenv("DB_HOST")
-PORT = os.getenv("DB_PORT")
-DBNAME = "EcoPackAI "
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL is not set in the .env file.")
 
-# Encode the password to handle special characters
-ENCODED_PASSWORD = quote_plus(PASSWORD)
-url = f"postgresql+psycopg2://{USER}:{ENCODED_PASSWORD}@{HOST}:{PORT}/{DBNAME}"
-
-print("Using URL:", url)
+print("Using URL:", DATABASE_URL)
 
 try:
-    engine = create_engine(url)
+    engine = create_engine(DATABASE_URL)
     df = pd.read_sql("SELECT current_database() as db;", engine)
     print("Connection Successful! Current database:")
     print(df)

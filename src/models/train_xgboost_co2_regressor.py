@@ -1,51 +1,57 @@
-
 import pandas as pd
-import joblib
 import numpy as np
+import joblib
 from xgboost import XGBRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error, r2_score, root_mean_squared_error
-from src.etl.feature_engineering import derive_features, CORE_FEATURES
+import os
 
-# CONFIG
-DATA_PATH = "data/processed/training_dataset.csv"
-MODEL_PATH = "models/xgb_co2_regressor.pkl"
+MATERIALS_PATH = "data/materials.csv"
+MODEL_PATH = "models/xgb_regressor.pkl"
+
+os.makedirs("models", exist_ok=True)
 
 def main():
-    print("Loading training dataset...")
-    df = pd.read_csv(DATA_PATH)
-    df = derive_features(df)
+    materials = pd.read_csv(MATERIALS_PATH)
 
-    # Target: eco_pressure (as a proxy for CO2 footprint, or replace with actual CO2 column if available)
+    rows = []
+    for _, m in materials.iterrows():
+        for frag in np.linspace(0, 1, 5):
+            for sus in np.linspace(0, 1, 5):
+                for dur in np.linspace(0, 1, 5):
+                    score = (
+                        0.4 * m.eco_score * sus +
+                        0.35 * m.durability_score * dur +
+                        0.25 * (1 - m.cost_score)
+                    )
 
-    if "eco_pressure" in df.columns:
-        target_col = "eco_pressure"
-    elif "co2_footprint" in df.columns:
-        target_col = "co2_footprint"
-    else:
-        raise ValueError("No CO2 target column found in dataset.")
+                    rows.append({
+                        "fragility_score": frag,
+                        "sustainability_priority": sus,
+                        "durability_requirement": dur,
+                        "eco_score": m.eco_score,
+                        "durability_score": m.durability_score,
+                        "cost_score": m.cost_score,
+                        "fragility_support": m.fragility_support,
+                        "target": score
+                    })
 
-    # Drop rows with NaN or infinite target values
-    df = df[np.isfinite(df[target_col])]
-    df = df.dropna(subset=[target_col])
+    df = pd.DataFrame(rows)
 
-    X = df[CORE_FEATURES]
-    y = df[target_col]
+    X = df.drop(columns=["target"])
+    y = df["target"]
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+    model = XGBRegressor(
+        n_estimators=300,
+        max_depth=6,
+        learning_rate=0.05,
+        subsample=0.9,
+        colsample_bytree=0.9,
+        random_state=42
     )
 
-    model = XGBRegressor(n_estimators=200, max_depth=8, learning_rate=0.05, random_state=42)
-    model.fit(X_train, y_train)
-    preds = model.predict(X_test)
-
-    print(f"RMSE: {root_mean_squared_error(y_test, preds):.4f}")
-    print(f"MAE: {mean_absolute_error(y_test, preds):.4f}")
-    print(f"R2: {r2_score(y_test, preds):.4f}")
-
+    model.fit(X, y)
     joblib.dump(model, MODEL_PATH)
-    print(f"XGBoost CO2 regressor saved to {MODEL_PATH}")
+
+    print("✅ XGBoost Regressor trained and saved")
 
 if __name__ == "__main__":
     main()
