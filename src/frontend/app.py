@@ -60,7 +60,7 @@ payload = {
 if st.button("🚀 Get Recommendation"):
     try:
         res = requests.post(
-            "http://localhost:5000/api/recommend",
+            "https://recommendationsystem-txbe.onrender.com",
             json=payload,
             timeout=10
         )
